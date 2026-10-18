@@ -19,8 +19,8 @@ data is the source of truth.
 
 ## Reference documents
 
-This skill ships two documents next to this file. Load one with the `skill` tool by naming the skill and the
-path inside it:
+This skill ships two documents in a `references/` subdirectory next to this file. Load one with the `skill` tool
+by naming the skill and the path inside it:
 
 | Resource | What it holds |
 | --- | --- |
@@ -51,7 +51,7 @@ the block type, with a **single-line JSON payload** as its body (in the database
 | Field | Meaning |
 | --- | --- |
 | `text` | Button label. Empty falls back to the plugin's default label. |
-| `icon` | One exact id from `references/icons.md`, for example `iconCirclePlay`. Empty string = no icon. An unknown id is silently dropped. |
+| `icon` | One exact id from `references/icons.md` (or one the active icon pack provides), for example `iconCirclePlay`. Empty string = no icon. An unknown id is silently dropped. |
 | `color` | Optional. Index 1–12 of SiYuan's built-in text colours (`--b3-font-colorN`). Omit it for the theme's primary colour; index 6 equals that colour, so it is indistinguishable from omitting it. |
 | `action` | Optional. Exactly one of the forms below; omit it for a button that does nothing. |
 
@@ -85,8 +85,8 @@ first. For an asset-directory file, the block attribute holds `assets/my-script.
 only recognizes that prefix), while the payload holds `data/assets/my-script.js`; the plugin maintains that
 attribute itself, just do not remove it.
 
-SiYuan describes the `file` tool as debugging and log reading only: use it for script files, nothing else in
-the workspace.
+SiYuan describes the `file` tool as debugging and log reading only: use it for script files and for reading this
+skill's `references/` documents, nothing else in the workspace.
 
 ## Creating a button block
 
@@ -97,10 +97,20 @@ Insert it with the `block` tool, writing the whole fence as Markdown:
 - `append` / `prepend` with `parentID` to put it at the end / start of that container instead.
 - Keep the block ID the call returns: it is what you need to find and change the button later.
 
+The fence text — newlines and all — is the value of `data`; the other arguments say where it goes:
+
+```json
+{
+    "action": "insert",
+    "dataType": "markdown",
+    "previousID": "<block ID to insert after>",
+    "data": "<the fence below, as one string>"
+}
 ```
-block action=insert previousID=<block ID to insert after> dataType=markdown
-data=;;;button-in-siyuan/button
-{"text":"Play","icon":"iconCirclePlay","action":{"type":"script","script":"console.log(\"clicked\"); return 1 + 1;"}}
+
+```
+;;;button-in-siyuan/button
+{"text":"Play","icon":"iconCirclePlay","action":{"type":"script","script":"showMessage(\"clicked\");"}}
 ;;;
 ```
 
@@ -200,7 +210,8 @@ mode, so a failure does not go unnoticed.
 
 - `get_kramdown` gives back the `;;;` fence, the payload line inside it parses with `JSON.parse`, and
   `action.type` is one of `link`, `script`, `file` (and, for `file`, the target really is readable).
-- Every `icon` id exists in `references/icons.md`, and `color`, if present, is an integer between 1 and 12.
+- Every `icon` id is listed in `references/icons.md` or comes from the active icon pack, and `color`, if present,
+  is an integer between 1 and 12.
 - For a script: you have decided what each click should show — the result window while working it out, a toast
   for a button that stays, your own window when the click needs input (see "Reporting from a script") — rather
   than leaving output that opens a window on every click. A button runs its script on every click, so keep

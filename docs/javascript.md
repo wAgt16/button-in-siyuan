@@ -32,14 +32,25 @@ after the first code line are ignored:
 
 | Declaration | Effect | Values |
 | --- | --- | --- |
-| `// @bis-output <mode>` | When the result window opens | `always` / `output` / `console` / `warn` / `error` / `never` |
+| `// @bis-output <mode>` | When the result window opens (modes below) | `always` / `output` / `console` / `warn` / `error` / `never` |
 | `// @bis-frontends <list>` | Frontends the script may run on | `all`, `desktop`, `desktop-window`, `mobile`, `browser-desktop`, `browser-mobile` |
 | `// @bis-backends <list>` | Backends the script may run on | `all`, `windows`, `linux`, `darwin`, `docker`, `android`, `ios`, `harmony` |
 
-Separate multiple values with commas or spaces. Without a declaration the default output mode applies and both
-the frontend and the backend are treated as `all`; an explicit `all` also means unrestricted. When the current
-environment is not in the declared list, no code runs and no result window opens: the user is told with a toast.
-The values are the same as SiYuan's marketplace `frontends` / `backends` fields.
+Separate multiple values with commas or spaces. Without a declaration the output mode is the plugin's configured
+one (default `output`) and both the frontend and the backend are treated as `all`; an explicit `all` also means
+unrestricted. When the current environment is not in the declared list, no code runs and no result window opens:
+the user is told with a toast. The values are the same as SiYuan's marketplace `frontends` / `backends` fields.
+
+The output modes, and what the default `output` means:
+
+| Mode | The result window opens when |
+| --- | --- |
+| `always` | on every run |
+| `output` (default) | the script writes console output, returns a value, or throws |
+| `console` | the script writes console output; a thrown error alone does **not** open it |
+| `warn` | a console `warn` / `error` line is written, or the script throws |
+| `error` | a console `error` line is written, or the script throws |
+| `never` | never |
 
 ```javascript
 // @bis-output error
@@ -69,13 +80,13 @@ writes the tag of the SiYuan version you are running into the addresses below, s
 
 When the jsdelivr CDN is unreachable or cannot serve the file, use the GitHub raw addresses instead: `https://raw.githubusercontent.com/siyuan-note/siyuan/{{siyuan-ref}}/` and leave the rest of the path unchanged.
 
-Fetch them with the `http_request` tool — `action` is the HTTP method and `url` the address, so a plain read is
-`http_request(action: "get", url: "…")`.
+Fetch them with `web_fetch` for a plain read, or with `http_request` — there `action` is the HTTP method and
+`url` the address, so a plain read is `http_request(action: "get", url: "…")`.
 
 | Name | Signature | Notes |
 | --- | --- | --- |
 | `fetchPost` | `fetchPost(url, data?, cb?, headers?)` | Without `cb` you can `await` the kernel response, with `cb` it uses SiYuan's own callback style |
-| `fetchSyncPost` | `fetchSyncPost(url, data?, headers?)` | POST over a synchronous XHR, resolving with the kernel response |
+| `fetchSyncPost` | `fetchSyncPost(url, data?, headers?)` | POST over a synchronous XHR; it still returns a promise, so `await` it like `fetchPost` |
 | `fetchGet` | `fetchGet(url, cb?)` | GET; without `cb` it is awaitable too |
 
 Responses have the shape `{code, msg, data}`, and `code === 0` means success.
@@ -100,7 +111,7 @@ Responses have the shape `{code, msg, data}`, and `code === 0` means success.
 
 | Name | Signature | Notes |
 | --- | --- | --- |
-| `openTab` | `openTab({app, doc?, asset?, pdf?, search?, card?, custom?, position?, …})` | Opens a document / asset / PDF / search / card / custom tab |
+| `openTab` | `openTab({app, doc?, asset?, pdf?, search?, card?, custom?, position?, …})` | Opens a document / asset / PDF / search / card / custom tab; a no-op on mobile, where `openMobileFileById` is the way to open a document |
 | `openWindow` | `openWindow({doc?, width?, height?, alwaysOnTop?, …})` | Opens a new desktop window; a no-op on mobile |
 | `openMobileFileById` | `openMobileFileById(app, id, action?)` | Opens a document by block ID on mobile |
 | `getActiveEditor` | `getActiveEditor(wndActive?)` | The current editor instance |
@@ -169,7 +180,7 @@ Neither can be undone, so ask with `confirm` first — see 3.6.
 ### 2.10 What else `plugin.` gives you
 
 - **Storage**: `plugin.saveData` / `loadData` / `removeData`, under
-  `/data/storage/petal/button-in-siyuan/storage/` (since issue #25; older versions wrote straight into the
+  `data/storage/petal/button-in-siyuan/storage/` (since issue #25; older versions wrote straight into the
   plugin directory and are migrated on the next read); names may contain subdirectories but cannot escape
   with `..`.
 - **Secrets and variables**: `plugin.getSecret(name)` / `plugin.getVariable(name)` — see 3.5.
@@ -324,16 +335,16 @@ result-window rule does not apply to it.
   timestamp or a check.
 - **`exitSiYuan` / `lockScreen` cannot be undone**: `confirm` first; `lockScreen` does nothing in read-only mode
   or on a publish service.
-- **Result window**: it opens when there is console output, a return value or an error; `@bis-output` (1.1)
-  overrides that per script.
+- **Result window**: with the default `output` mode it opens when there is console output, a return value or an
+  error; the modes in 1.1 (`@bis-output`) change that per script — `console`, for example, ignores a thrown error.
 - **Two ways to call `fetchPost`**: `await fetchPost(url, data)` resolves with the response; `fetchPost(url, data, cb)`
   uses the callback, which only fires when `code >= 0`.
 - **Read-only state**: write APIs are rejected in publish mode and read-only documents (`code` is not 0); check
   `window.siyuan.config.readonly` first.
 - **Cross-origin**: on desktop with a local kernel `fetch("https://…")` works directly; with a remote kernel the
   usual same-origin rules apply.
-- **Mobile**: `openTab` and `openWindow` are no-ops, and `getActiveTab` / `getAllModels` / `getAllTabs` plus the
-  dock helpers of 2.4 are unavailable.
+- **Mobile**: `openTab` and `openWindow` are no-ops; `getActiveTab` / `getAllModels` / `getAllTabs` are
+  `undefined`, and the dock helpers of 2.4 return `false`.
 - **Plugin storage**: `plugin.loadData` may resolve with a string instead of an object — see 3.4.
 - **Destructive calls**: `/api/block/deleteBlock`, `/api/filetree/removeDoc` and friends cannot be undone.
 - **Debugging**: every `console` line also reaches the SiYuan console. Add a `debugger` statement when you need
