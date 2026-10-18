@@ -168,6 +168,14 @@
   **设置必须存成对象**：插件存储文件没有扩展名，内核按内容嗅探 Content-Type，只有 `{…}` / `[…]` 才解析回
   对象，裸数字会变成字符串。
 
+## 测试
+
+* `npm test` 跑 `tests/` 下的 vitest 单元测试（jsdom 环境）。`vitest.config.mts` 把 `siyuan` 指到
+  `tests/mocks/siyuan.ts`，宿主对象、内核接口与对话框都有可控替身，测试不会启动思源、也不碰本机工作区。
+* 测试文件按 `src/` 模块一一对应；`npm run typecheck:tests` 用 `tsconfig.tests.json` 单独检查测试类型
+  （`tsconfig.json` 仍只覆盖 `src/`，打包与插件类型不受影响）。
+* CI 的 `test` job 跑 `npm test`；`check` job 的 `npm run check` 还包含测试类型检查与打包构建。
+
 ## 构建产物与发布
 
 * 集市图片的图源是手绘的 `assets/icon.svg` 与 `assets/preview.html`，改完必须重跑渲染脚本：`icon.png` 由
