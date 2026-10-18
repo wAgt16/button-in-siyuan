@@ -1,8 +1,8 @@
-import {confirm, Dialog, showMessage} from "siyuan";
+import {confirm, Dialog, fetchSyncPost, showMessage} from "siyuan";
 import {setAssetReference} from "./assetReference";
 import {useBottomSheet} from "./bottomSheet";
 import type {IButtonConfig, TButtonAction} from "./buttonBlock";
-import {BUTTON_COLOR_INDEXES, serializeButtonConfig, updateButtonContent} from "./buttonBlock";
+import {BUTTON_COLOR_INDEXES, runAction, serializeButtonConfig, updateButtonContentAsync} from "./buttonBlock";
 import {createCodeEditor} from "./codeEditor";
 import type {IContext} from "./context";
 import {guardUnsavedChanges} from "./discardChanges";
@@ -85,40 +85,67 @@ const askAboutRemoteScript = (context: IContext, url: string) => new Promise<str
     });
 });
 
-/** 打开「编辑按钮块」对话框，确定后由宿主的自定义块渲染器写回并重新渲染。 */
-export const openButtonBlockEditor = (context: IContext, options: {
-    blockID: string,
-    config: IButtonConfig,
+/** 编辑窗口的选项。顶栏快捷操作与按钮块共用这个窗口，只是保存、删除、运行三个出口不同。 */
+export interface IButtonEditorOptions {
+    /** 按钮块 ID；顶栏快捷操作没有块，传空串。 */
+    blockID: string;
+    config: IButtonConfig;
     /**
      * 是否允许编辑。笔记锁定时传 false：窗口退化成预览 —— 所有编辑控件禁用、没有「确定」按钮，
      * 也完全不写回块内容（见 issue #19）。
      */
-    editable?: boolean,
-}) => {
+    editable?: boolean;
+    /** 覆盖窗口标题（顶栏快捷操作用自己的标题）。 */
+    title?: string;
+    /** 是否显示配色选择，默认显示；顶栏快捷操作只允许文本、图标与操作，配色不可改（issue #30）。 */
+    colorEditable?: boolean;
+    /** 是否显示删除按钮，默认显示；新建顶栏快捷操作时还没有东西可删。 */
+    deletable?: boolean;
+    /** 保存出口；返回 false 时留在窗口里。不给就是按钮块，写回块内容。 */
+    onSave?: (config: IButtonConfig) => Promise<boolean>;
+    /** 删除出口（调用前已经二次确认）；返回 false 时留在窗口里。不给就是删除按钮块。 */
+    onDelete?: () => Promise<boolean>;
+    /** 运行出口；不给就走按钮块同一条 runAction。 */
+    onRun?: (config: IButtonConfig) => void;
+    /** 窗口关闭后执行（管理器用它刷新列表，块被删除或内容被改都会走到这里）。 */
+    onClosed?: () => void;
+}
+
+/** 打开「编辑按钮块」对话框，确定后由宿主的自定义块渲染器写回并重新渲染。 */
+export const openButtonBlockEditor = (context: IContext, options: IButtonEditorOptions) => {
     const {i18n} = context;
     const blockID = options.blockID;
     const config = options.config;
     const editable = options.editable !== false;
+    const colorEditable = options.colorEditable !== false;
+    // 运行脚本时把块元素交给作用域，脚本里的 protyle 才能拿到当前编辑器；块不在当前窗口时为空
+    const blockElement = blockID
+        ? document.querySelector<HTMLElement>(`[data-type="NodeCustomBlock"][data-node-id="${blockID}"]`) || undefined
+        : undefined;
     let icon = config.icon;
     /** 0 表示不覆写颜色（思源原生蓝），见 BUTTON_COLOR_INDEXES。 */
-    let color = config.color || 0;
-    log.info("opened the button block editor", {
-        blockID,
+    let color = colorEditable ? config.color || 0 : 0;
+    log.info("opened the button editor", {
+        blockID: blockID || "topbar",
         text: config.text,
         icon: icon || "none",
         color: color || "default",
         action: config.action?.type || "none",
         isMobile: context.isMobile,
         editable,
+        colorEditable,
     });
     // 移动端把这个对话框换成思源原生的底部抽屉（issue #23）；桌面端保持居中窗口。
     // 清理函数在对话框销毁时执行，移除手势监听并复原行内样式
     let disposeSheet: (() => void) | undefined;
     const dialog = new Dialog({
-        title: i18n.editButtonBlock,
+        title: options.title || i18n.editButtonBlock,
         // 比原来的 640px 宽一圈；宽度用 min() 收在视口内（思源自己也给容器留了 88vw 的上限）
         width: "min(760px, 92vw)",
-        destroyCallback: () => disposeSheet?.(),
+        destroyCallback: () => {
+            disposeSheet?.();
+            options.onClosed?.();
+        },
         content: `<div class="b3-dialog__content" data-bis="editor-body">
     <div class="ft__on-surface ft__breakword fn__none" data-bis="readonly-tip"><strong>${i18n.readonlyPreviewTip}</strong></div>
     <div class="ft__on-surface">${i18n.buttonText}</div>
@@ -132,10 +159,12 @@ export const openButtonBlockEditor = (context: IContext, options: {
         <div class="fn__space"></div>
         <button class="b3-button b3-button--outline" data-bis="clear-icon">${i18n.clearIcon}</button>
     </div>
-    <div class="fn__hr"></div>
-    <div class="ft__on-surface">${i18n.buttonColor}</div>
-    <div class="fn__hr--small"></div>
-    <div class="bis-button-colors" data-bis="colors"></div>
+    <div data-bis="color-field" class="${colorEditable ? "" : "fn__none"}">
+        <div class="fn__hr"></div>
+        <div class="ft__on-surface">${i18n.buttonColor}</div>
+        <div class="fn__hr--small"></div>
+        <div class="bis-button-colors" data-bis="colors"></div>
+    </div>
     <div class="fn__hr"></div>
     <div class="ft__on-surface">${i18n.buttonAction}</div>
     <div class="fn__hr--small"></div>
@@ -183,6 +212,11 @@ export const openButtonBlockEditor = (context: IContext, options: {
     </div>
 </div>
 <div class="b3-dialog__action">
+    <div class="fn__flex bis-action-start">
+        <button type="button" class="b3-button b3-button--remove b3-button--icon b3-tooltips b3-tooltips__n${options.deletable === false ? " fn__none" : ""}" data-bis="delete" aria-label="${options.onDelete ? i18n.deleteTopBarButton : i18n.deleteButtonBlock}"><svg><use xlink:href="#iconTrashcan"></use></svg></button>
+        <div class="fn__space"></div>
+        <button type="button" class="b3-button b3-button--outline b3-button--icon b3-tooltips b3-tooltips__n" data-bis="run" aria-label="${i18n.runButtonBlock}"><svg><use xlink:href="#iconCirclePlay"></use></svg></button>
+    </div>
     <button class="b3-button b3-button--cancel" data-bis="cancel">${i18n.cancel}</button>
     <div class="fn__space"></div>
     <button class="b3-button b3-button--text fn__none" data-bis="save">${i18n.save}</button>
@@ -282,7 +316,7 @@ export const openButtonBlockEditor = (context: IContext, options: {
         return {
             text: textElement.value.trim() || i18n.defaultButtonText,
             icon,
-            color: color || undefined,
+            color: colorEditable ? color || undefined : undefined,
             action,
         };
     };
@@ -310,6 +344,8 @@ export const openButtonBlockEditor = (context: IContext, options: {
             field<HTMLButtonElement>(type).disabled = true;
         });
         dialog.element.querySelector('[data-bis="readonly-tip"]')?.classList.remove("fn__none");
+        // 锁定的笔记里不能删块；运行仍可用，与直接点击按钮块的行为一致
+        field<HTMLButtonElement>("delete").disabled = true;
     } else {
         field<HTMLButtonElement>("save").classList.remove("fn__none");
     }
@@ -462,12 +498,15 @@ export const openButtonBlockEditor = (context: IContext, options: {
             }
         }
         const next = currentConfig();
-        if (!updateButtonContent(blockID, next)) {
-            log.error("failed to write the button block back, keeping the dialog open", {blockID});
+        // 顶栏快捷操作由 onSave 写文件；块在别的文档里（管理器打开）时没有渲染器可写，
+        // updateButtonContentAsync 会自动回落到内核的 updateBlock
+        const written = options.onSave ? await options.onSave(next) : await updateButtonContentAsync(blockID, next);
+        if (!written) {
+            log.error("failed to write the button back, keeping the dialog open", {blockID: blockID || "topbar"});
             showMessage(i18n.blockNotEditable);
             return;
         }
-        log.info("saved the button block", {
+        log.info("saved the button", {
             blockID,
             text: next.text,
             icon: icon || "none",
@@ -475,11 +514,61 @@ export const openButtonBlockEditor = (context: IContext, options: {
             action: next.action?.type || "none",
             file: next.action?.type === "file" ? next.action.file : "none",
         });
-        // 让思源知道这个块引用了哪个脚本文件，免得它出现在「未引用的资源文件」里被清理掉
-        void setAssetReference(blockID, next);
+        // 让思源知道这个块引用了哪个脚本文件，免得它出现在「未引用的资源文件」里被清理掉。
+        // 顶栏快捷操作不是块，没有块属性要维护
+        if (!options.onSave) {
+            void setAssetReference(blockID, next);
+        }
         // 已经写回块里了，关窗时不必再问一次
         saved = true;
         dialog.destroy();
+    });
+    // 运行：拿表单当前值走与点击按钮块完全相同的 runAction，不用先保存就能试
+    field<HTMLButtonElement>("run").addEventListener("click", () => {
+        const running = currentConfig();
+        log.info("running the button from the editor", {
+            blockID: blockID || "topbar",
+            action: running.action?.type || "none",
+            editable,
+        });
+        if (options.onRun) {
+            options.onRun(running);
+        } else {
+            runAction(context, {blockID, blockElement, config: running});
+        }
+    });
+    // 删除：二次确认后走内核接口，块从文档里移除
+    field<HTMLButtonElement>("delete").addEventListener("click", () => {
+        if (!editable) {
+            log.warn("delete rejected: the note is locked", {blockID});
+            return;
+        }
+        confirm(options.onDelete ? i18n.deleteTopBarButton : i18n.deleteButtonBlock,
+            options.onDelete ? i18n.deleteTopBarButtonTip : i18n.deleteButtonBlockTip, () => {
+                void (async () => {
+                    try {
+                        if (options.onDelete) {
+                            if (!await options.onDelete()) {
+                                log.error("failed to delete the top bar button");
+                                showMessage(i18n.deleteTopBarButtonFailed);
+                                return;
+                            }
+                        } else {
+                            const response = await fetchSyncPost("/api/block/deleteBlock", {id: blockID}, undefined, false);
+                            if (response.code !== 0) {
+                                throw new Error(response.msg || `/api/block/deleteBlock code ${response.code}`);
+                            }
+                        }
+                        log.info("deleted the button", {blockID: blockID || "topbar"});
+                        // 已经删了，关窗时不用再问「放弃修改」
+                        saved = true;
+                        dialog.destroy();
+                    } catch (error) {
+                        log.error("failed to delete the button", {blockID: blockID || "topbar", error});
+                        showMessage(options.onDelete ? i18n.deleteTopBarButtonFailed : i18n.deleteButtonBlockFailed);
+                    }
+                })();
+            });
     });
     // 打开窗口时不聚焦任何输入框（原来是聚焦并全选按钮文字，顺手敲键盘就把它改掉了），要改哪一项用户自己点：
     // 焦点留在宿主的对话框容器上，Tab 与 Esc 照常

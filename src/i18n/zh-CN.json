@@ -1,6 +1,10 @@
 {
   "insertButtonBlock": "按钮块",
   "editButtonBlock": "编辑按钮块",
+  "runButtonBlock": "运行按钮块",
+  "deleteButtonBlock": "删除按钮块",
+  "deleteButtonBlockTip": "删除后无法撤销，按钮块会从文档中移除。",
+  "deleteButtonBlockFailed": "删除失败，详情见控制台（需打开调试模式）",
   "defaultButtonText": "按钮",
   "buttonText": "按钮文本",
   "buttonIcon": "按钮图标",

@@ -69,6 +69,14 @@
   `plugin.loadData`。用户资源目录里的脚本仍要写 `custom-data-assets-button-in-siyuan` 属性，但内核的
   `IsAssetLinkDest` 只认 `assets/` 前缀，所以属性值由 `assetPathOf()` 从完整路径转回 `assets/…`；
   插件 `scripts/` 下的脚本不是资源，属性会被清掉。
+* **编辑窗口的运行与删除**（issue #27）：左下角两个纯图标按钮，运行用 `runAction()` 走与点击按钮块同一条
+  路径（表单当前值，不要求先保存；链接、内联脚本、脚本文件都一样），删除走 `/api/block/deleteBlock` 并
+  先二次确认。删除成功后把 `saved` 置真再关窗，避免「放弃修改」再拦一次；笔记锁定时只禁用删除，运行照旧，
+  因为直接点击锁定笔记里的按钮块本来就会执行。**按钮尺寸不要自己写死**：宿主的 `.b3-dialog__action` 是
+  `align-items: center`，只有图标的按钮会缩到「16px 图标 + 8px 内边距」＝ 24px 高，图标因此显得偏大、按钮
+  也不方正；同一窗口的 JS 文件路径行是 28×28，因为那圈 `.fn__flex`（`display: flex`，默认 stretch）把它
+  拉到了与输入框同高。`.bis-action-start` 因此用 `align-self: stretch` 撑满整行，外观仍然全部来自
+  `.b3-button--icon`。
 * **脚本数据文件**（issue #25）：注入给脚本的 `plugin` 是插件实例的代理（`src/scriptStorage.ts`），只把
   `saveData` / `loadData` / `removeData` 的名字改写到插件目录下的 `storage/` 子目录，其余属性与方法原样
   转发，方法都绑回真实实例（宿主的生命周期检查按实例身份判断）。旧版本写在插件目录根的数据文件在第一次

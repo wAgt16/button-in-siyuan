@@ -1,6 +1,10 @@
 {
   "insertButtonBlock": "Button block",
   "editButtonBlock": "Edit button block",
+  "runButtonBlock": "Run the button block",
+  "deleteButtonBlock": "Delete the button block",
+  "deleteButtonBlockTip": "This cannot be undone: the button block is removed from the document.",
+  "deleteButtonBlockFailed": "The delete failed; see the console for details (turn on Debug mode)",
   "defaultButtonText": "Button",
   "buttonText": "Button text",
   "buttonIcon": "Button icon",

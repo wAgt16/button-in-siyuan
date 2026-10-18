@@ -146,7 +146,11 @@ const runScriptFile = async (context: IContext, options: {
     });
 };
 
-const runAction = (context: IContext, options: {
+/**
+ * 执行一个按钮配置（链接、内联脚本或脚本文件），按钮的点击与编辑窗口里的「运行」共用这一处，
+ * 两边行为不会漂移。
+ */
+export const runAction = (context: IContext, options: {
     blockID: string;
     blockElement?: HTMLElement;
     config: IButtonConfig;

@@ -36,7 +36,7 @@ Requires SiYuan 3.8.6 or later.
    inserted at the caret.
 2. Open "Edit button block": click the block icon and choose <kbd>Plugin</kbd> >
    <kbd>Edit button block</kbd>, or right-click the button (desktop) / long-press it (mobile).
-3. Set the text, the icon and the action in the dialog, then confirm.
+3. Set the text, the icon and the action in the dialog, then confirm. The run button at the bottom left executes the current form values once (exactly like clicking the block, without saving first); the delete button asks for confirmation and then removes the block from the document.
 
 ## Settings
 

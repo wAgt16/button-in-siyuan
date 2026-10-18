@@ -6,6 +6,10 @@
 export type II18n = {
     insertButtonBlock: string;
     editButtonBlock: string;
+    runButtonBlock: string;
+    deleteButtonBlock: string;
+    deleteButtonBlockTip: string;
+    deleteButtonBlockFailed: string;
     defaultButtonText: string;
     buttonText: string;
     buttonIcon: string;

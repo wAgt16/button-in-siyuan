@@ -36,6 +36,165 @@
     border-radius: 0;
 }
 
+// 「按钮块管理」窗口（src/buttonManager.ts）：左侧列表、右侧预览。正文本身是 flex 容器，
+// 列表与预览各自滚动，窗口拖动改尺寸时一起变。
+.bis-manager {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-height: 0;
+
+    &__toolbar {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        align-items: center;
+        flex-shrink: 0;
+
+        // 顶栏按钮管理器在工具栏里放一段说明文字，长文案要能换行而不是把按钮挤出去
+        > .fn__flex-1 {
+            min-width: 0;
+        }
+    }
+
+    &__body {
+        display: flex;
+        gap: 12px;
+        flex: 1 1 auto;
+        min-height: 0;
+    }
+
+    &__list {
+        flex: 0 0 46%;
+        min-width: 0;
+        overflow: auto;
+        padding-right: 8px;
+        border-right: 1px solid var(--b3-border-color);
+    }
+
+    &__preview {
+        flex: 1 1 auto;
+        min-width: 0;
+        overflow: auto;
+        padding-left: 4px;
+    }
+
+    &__row {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        cursor: pointer;
+
+        &--current {
+            background-color: var(--b3-list-hover);
+        }
+    }
+
+    &__row-icon {
+        display: flex;
+        align-items: center;
+        flex-shrink: 0;
+        color: var(--b3-theme-on-surface);
+    }
+
+    &__row-text {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+
+    &__row-title,
+    &__row-meta {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    // 行内预览沿用原生按钮外观，但要能塞进列表：取消 fn__size200 的固定宽度
+    &__chip {
+        width: auto;
+        min-width: 0;
+        max-width: 180px;
+        flex-shrink: 1;
+        overflow: hidden;
+        pointer-events: none;
+    }
+
+    &__preview-button {
+        margin-bottom: 4px;
+        pointer-events: none;
+    }
+
+    // 快捷操作（顶栏）的预览头：只有图标与文本，不套按钮外观
+    &__action {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    &__action-title {
+        font-size: var(--b3-font-size);
+    }
+
+    &__meta {
+        margin: 0;
+
+        dt {
+            margin-top: 10px;
+        }
+
+        dd {
+            margin: 2px 0 0;
+        }
+    }
+
+    &__actions {
+        display: flex;
+        gap: 8px;
+        margin-top: 16px;
+    }
+
+    &__status {
+        flex-shrink: 0;
+    }
+
+    &__hint {
+        padding: 8px 0;
+    }
+}
+
+// 窄屏（移动端与小窗口）：列表与预览上下排，各自占一半高度
+@media (max-width: 750px) {
+    .bis-manager__body {
+        flex-direction: column;
+    }
+
+    .bis-manager__list {
+        flex: 1 1 50%;
+        padding-right: 0;
+        padding-bottom: 8px;
+        border-right: 0;
+        border-bottom: 1px solid var(--b3-border-color);
+    }
+
+    .bis-manager__preview {
+        flex: 1 1 50%;
+        padding-left: 0;
+    }
+}
+
+// 编辑窗口左下角的运行 / 删除：宿主的 .b3-dialog__action 是 flex-end，这里用 margin-right:auto 把
+// 这一组推到最左边（布局用宿主的 fn__flex / fn__space）。按钮本身完全交给思源原生的
+// .b3-button--icon（内含图标尺寸与内边距），插件只给颜色修饰类：运行用 outline、删除用 remove。
+//
+// 宿主的操作栏是 align-items:center，一列纯图标按钮会缩到「图标 16px + 上下内边距 8px」= 24px，
+// 比同一行里带文字的按钮（20px 行高 + 8px）矮 4px，图标在按钮里也就显得偏大、按钮不再方正。
+// 同一个窗口的 JS 文件路径行之所以是 28×28，是因为那一圈 .fn__flex 默认 stretch，把按钮拉到了与
+// 输入框同高。这里让这一组也撑满整行，两个按钮就与那四个原生图标按钮完全一致。
+.bis-action-start {
+    margin-right: auto;
+    align-self: stretch;
+}
+
 // 编辑窗口里的色板：直接复用思源正文颜色面板的 .color__square（自带 26px 方块与 4px 间距）。
 .bis-button-colors {
     display: flex;
