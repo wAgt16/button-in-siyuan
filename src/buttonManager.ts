@@ -22,7 +22,8 @@ interface IButtonRow {
 
 const actionTypeOf = (config: IButtonConfig) => config.action?.type || "none";
 
-const actionSummary = (context: IContext, config: IButtonConfig) => {
+/** 操作的一句话摘要，按钮块管理器与快捷操作管理器的预览共用。 */
+export const describeButtonAction = (context: IContext, config: IButtonConfig) => {
     const {i18n} = context;
     const action: TButtonAction | undefined = config.action;
     if (!action) {
@@ -182,7 +183,7 @@ export const openButtonBlockManager = (context: IContext, options: IButtonBlockM
             detail.textContent = value;
             meta.append(term, detail);
         };
-        addMeta(i18n.managerAction, actionSummary(context, row.config));
+        addMeta(i18n.managerAction, describeButtonAction(context, row.config));
         addMeta(i18n.managerDoc, row.rootTitle || "-");
         addMeta(i18n.managerPath, row.path || "-");
         addMeta(i18n.managerBlockID, row.id);

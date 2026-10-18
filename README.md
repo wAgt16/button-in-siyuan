@@ -19,6 +19,8 @@ Insert native SiYuan buttons into documents, with text, a built-in icon and a li
   (a local file under `data/assets/` or the plugin's `scripts/` directory, or an http(s) address).
 * The JavaScript editor is CodeMirror with line numbers, syntax highlighting, bracket matching and
   completion; its colors follow SiYuan's code highlighting scheme.
+* The top bar has a quick-action entry: clicking it opens a menu of custom actions, each stored as one JSON
+  file and using the same actions as button blocks.
 
 ## Install
 
@@ -37,6 +39,21 @@ Requires SiYuan 3.8.6 or later.
 2. Open "Edit button block": click the block icon and choose <kbd>Plugin</kbd> >
    <kbd>Edit button block</kbd>, or right-click the button (desktop) / long-press it (mobile).
 3. Set the text, the icon and the action in the dialog, then confirm. The run button at the bottom left executes the current form values once (exactly like clicking the block, without saving first); the delete button asks for confirmation and then removes the block from the document.
+
+## Top bar quick actions
+
+The desktop top bar has a lightning icon; on mobile the same entry sits in the top bar's Plugins menu (that is how the host registers icon top bar entries there). Click it to open the quick action menu: the menu only runs the actions and always ends with a "Manage quick actions" item. Creating and editing happen in that manager (the add icon in its top-right corner, a native SiYuan icon button).
+Each quick action is one JSON file in the plugin data directory:
+
+```
+data/storage/petal/button-in-siyuan/topbar/<file name>.json
+```
+
+One file is one quick action, and the menu follows file name order. The content is `{"text","icon","action"}`; `action` is exactly the same as for a button block (link, JavaScript, JavaScript file).
+The manager lists and previews each action by its icon and label only — it is not styled as a button. Only the
+text, the icon and the action are editable; the colour cannot be changed (a `color` field in the file is ignored).
+The plugin re-reads that directory every time the menu opens, so creating or editing a file with an agent needs no
+plugin reload — add, change or delete the file and the menu follows.
 
 ## Settings
 
@@ -100,6 +117,8 @@ Full guide with ready-to-paste examples: [docs/javascript.md](./docs/javascript.
   and no export carries it**, and a **Markdown `.zip` does not carry `data/assets/` scripts either** (SiYuan
   collects resources from the exported Markdown text, where block attributes take no part and a plugin cannot
   hook in). Use the HTML or Word export there, or copy the script along yourself.
+* Mobile has no separate top bar icon: the quick-action entry lives in the top bar's Plugins menu. The
+  data files still sync with the workspace.
 * The JavaScript action is not sandboxed; it runs with the same privileges as the user's own code
   snippets. Only run code you trust.
 * The icon list comes from the icons loaded in the current interface, so a third-party icon package

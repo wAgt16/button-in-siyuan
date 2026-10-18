@@ -155,7 +155,7 @@ export const updateButtonContentAsync = async (blockID: string, config: IButtonC
 };
 
 /**
- * 按配置造一个思源原生按钮（不含点击行为）。按钮块的渲染、管理器预览与顶栏快捷按钮共用这一处，
+ * 按配置造一个思源原生按钮（不含点击行为）。按钮块的渲染与按钮块管理器的预览共用这一处，
  * 颜色、图标与文本的口径不会各自漂移。
  */
 export const createButtonElement = (context: IContext, config: IButtonConfig) => {

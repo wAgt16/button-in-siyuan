@@ -71,6 +71,15 @@
   `plugin.loadData`。用户资源目录里的脚本仍要写 `custom-data-assets-button-in-siyuan` 属性，但内核的
   `IsAssetLinkDest` 只认 `assets/` 前缀，所以属性值由 `assetPathOf()` 从完整路径转回 `assets/…`；
   插件 `scripts/` 下的脚本不是资源，属性会被清掉。
+* **顶栏快捷操作**（issue #30）：在 `onload` 里 `addTopBar` 注册一个 `iconZap` 条目，`onunload`
+  用 `removeTopBar` 配对移除；带 icon 的条目在桌面端是顶栏图标，移动端由宿主放进顶栏的「插件」菜单。点击时现读
+  `data/storage/petal/button-in-siyuan/topbar/`（`src/topBar.ts`）：一个快捷操作一个 JSON 文件，按文件名排序，
+  内容与块 payload 同形但丢掉 `color`（只允许文本、图标与操作，配色不可改）；文件内容非法或没有认识字段的跳过并记日志。
+  菜单每次展开都重新列目录，Agent 新建 / 编辑文件后无需重载。**菜单只执行、末尾只给一个「管理」入口**，
+  新建与编辑都在管理面板里；面板的加号是思源原生图标按钮（`b3-button--outline b3-button--icon`），
+  列表与预览只用图标 + 文本，不套按钮外观（`bis-manager__row-icon` / `bis-manager__action`）。
+  编辑器复用那个编辑窗口，把保存 / 删除 / 运行换成文件操作，并隐藏配色；新建时 `deletable: false`，
+  编辑时删除会删掉对应文件。执行走同一个 `runAction`，但没有块上下文（`blockID` 为空串、`protyle` 为 undefined）。
 * **按钮块管理**（issue #28）：入口是设置面板里的一个按钮，窗口在 `src/buttonManager.ts`。列表用一条 SQL
   取 `type = 'custom' AND markdown LIKE ';;;button-in-siyuan/button%'` 的块（显式 `LIMIT`，理由同
   `assetReference.ts`），逐条过 `parseButtonConfig`，不是本插件配置的块跳过；搜索与操作类型筛选都在内存里

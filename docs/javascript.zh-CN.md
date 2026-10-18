@@ -153,7 +153,7 @@ jsdelivr CDN连不上或取不到文件时，改用 GitHub 原文件地址：`ht
 | 名字 | 说明 |
 | --- | --- |
 | `protyle` | 当前按钮块所在的编辑器实例，取不到时为 `undefined` |
-| `blockID` | 当前按钮块自己的块 ID |
+| `blockID` | 当前按钮块自己的块 ID；顶栏快捷操作没有块上下文，这里是空串 |
 | `isMobile` | 是否移动端 |
 | `i18n` | 本插件的文案（例如 `i18n.copied`） |
 

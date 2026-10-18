@@ -11,6 +11,7 @@ import type {II18n} from "./i18nKeys";
 import {createLogger, setDebugEnabled} from "./logger";
 import type {ISettings, TCodeMode, TOutputMode} from "./settings";
 import {CODE_MODES, DEFAULT_SETTINGS, loadSettings, OUTPUT_MODES, saveSettings} from "./settings";
+import {openTopBarManager, openTopBarMenu, TOPBAR_ICON, TOPBAR_ID} from "./topBar";
 import "./index.scss";
 
 const log = createLogger("plugin");
@@ -96,6 +97,26 @@ export default class ButtonInSiYuan extends Plugin {
             render: (options) => renderButtonBlock(context, options),
         };
         this.eventBus.on("click-blockicon", this.blockIconMenu);
+        // 顶栏快捷操作（issue #30）：点击展开菜单，右键与菜单末尾都只给管理入口。
+        // 桌面端是顶栏图标；移动端宿主把图标条目放进「插件」顶栏菜单（addTopBar 对带 icon 的条目两边都注册）
+        this.addTopBar({
+            id: TOPBAR_ID,
+            icon: TOPBAR_ICON,
+            title: context.i18n.topBarTitle,
+            callback: (event) => {
+                const target = event.currentTarget instanceof HTMLElement ? event.currentTarget : undefined;
+                void openTopBarMenu(this.context, target);
+            },
+            contextMenu: (menu) => {
+                // 快捷操作菜单与右键菜单都只给管理入口：新建在管理面板里用加号完成
+                menu.addItem({
+                    icon: "iconSettings",
+                    label: context.i18n.topBarManage,
+                    click: () => openTopBarManager(this.context),
+                });
+            },
+        });
+        log.debug("registered the top bar entry", {id: TOPBAR_ID, icon: TOPBAR_ICON});
         this.protyleSlash = [{
             // filter 是斜杠菜单的搜索关键字（不显示给用户，所以不放进 i18n）：
             // 中文界面按「按钮块」、英文界面按 button / btn 都能搜到
@@ -115,6 +136,7 @@ export default class ButtonInSiYuan extends Plugin {
 
     onunload() {
         this.eventBus.off("click-blockicon", this.blockIconMenu);
+        this.removeTopBar(TOPBAR_ID);
         log.info("plugin unloaded");
         // 禁用、重载与卸载都会走到这里：宿主的 teardown 一定先跑 onunload，只有卸载时才接着补跑
         // uninstall（siyuan 的 app/src/plugin/lifecycle.ts）。所以技能在这里删一次就覆盖了「禁用」

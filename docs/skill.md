@@ -125,6 +125,45 @@ this works through the block tool and through `/api/block/insertBlock` alike.
 
 Read it back once afterwards: the kernel may normalise content, so confirm what actually landed.
 
+## Top bar quick actions
+
+The top bar has a lightning entry that opens a menu of **quick actions** (on mobile the same entry sits in the
+top bar's Plugins menu). They are actions, not button blocks: the menu only runs them and always ends with a
+"Manage quick actions" item, where you create and edit them (the add icon in the manager's top-right corner) or
+you write the files yourself. They are not blocks and do not live in a document: each one is a JSON file under
+
+```
+data/storage/petal/button-in-siyuan/topbar/<name>.json
+```
+
+The menu is built from that directory every time the entry is clicked, so creating or editing a file takes
+effect without reloading the plugin. Files are shown in **file name order**: prefix names with `01-`, `02-` to
+control the order. A file's content is the same payload as a button block, minus `color`:
+
+```json
+{
+    "text": "Daily note",
+    "icon": "iconCalendar",
+    "action": {"type": "link", "link": "siyuan://blocks/20240101000000-abcdefg"}
+}
+```
+
+| Field | Meaning |
+| --- | --- |
+| `text` | Menu label. Empty falls back to the plugin's default label. |
+| `icon` | Optional icon id from `references/icons.md`; omit or use `""` for no icon. |
+| `action` | Optional, exactly the same forms as the block payload (`link`, `script`, `file`). |
+
+Quick actions can change their text, icon and action, but not their colour: **`color` is ignored** (the plugin
+drops it when it saves through its own editor), so do not add it. Write the file as one JSON object with
+indentation; invalid JSON or an object with none of `text` / `icon` / `action` is skipped and logged, not shown
+in the menu. Use the `file` tool or `/api/file/putFile` with the full path above; the parent directory is
+created on the first write. Deleting the file removes the action from the menu. The manager lists and previews
+each action by its icon and label only — it deliberately does not render a button block. The manager's editor
+can also create, edit, run and delete these files, and its script action has the same output dialog behaviour
+as a button block — but a quick action has no block context, so in an inline script `blockID` is an empty
+string and `protyle` is `undefined`; use a script file or a link when you need the current document.
+
 ## Reporting from a script
 
 A button is clicked again and again, so decide *per button* what the user should see each time. Three

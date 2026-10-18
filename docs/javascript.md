@@ -163,7 +163,7 @@ Neither can be undone, so ask with `confirm` first — see 3.6.
 | Name | Notes |
 | --- | --- |
 | `protyle` | The editor instance that contains this button block, `undefined` when it cannot be found |
-| `blockID` | The block ID of the button block itself |
+| `blockID` | The block ID of the button block itself; a top bar quick action has no block context, so this is an empty string |
 | `isMobile` | Whether this is the mobile frontend |
 | `i18n` | This plugin's strings (for example `i18n.copied`) |
 
