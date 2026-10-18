@@ -3,6 +3,7 @@ import type {IEventBusMap, Protyle} from "siyuan";
 import {downloadAgentSkill, installAgentSkill, removeAgentSkill} from "./agentSkill";
 import {syncAssetReferences, syncRenderedAssetReference} from "./assetReference";
 import {createButtonBlockIconHtml} from "./buttonIcon";
+import {openButtonBlockManager} from "./buttonManager";
 import {BUTTON_BLOCK_TYPE, DEFAULT_BUTTON_ICON, parseButtonConfig, renderButtonBlock, serializeButtonConfig} from "./buttonBlock";
 import type {IContext} from "./context";
 import {openButtonBlockEditor} from "./editDialog";
@@ -180,6 +181,18 @@ export default class ButtonInSiYuan extends Plugin {
         skillDownload.className = "b3-button b3-button--outline";
         skillDownload.textContent = i18n.downloadSkill;
         skillDownload.addEventListener("click", () => void this.downloadSkill(skillDownload));
+        // 按钮块管理是独立窗口（issue #28），设置面板只留一个入口
+        const managerButton = document.createElement("button");
+        managerButton.className = "b3-button b3-button--outline";
+        managerButton.textContent = i18n.openButtonManager;
+        managerButton.addEventListener("click", () => {
+            // 定位要回到文档，跳转前先关掉这个设置面板：面板是思源自己的 Dialog，而当前 siyuan 类型里
+            // Setting 还没有 close()，所以按实例从 window.siyuan.dialogs 找回它再销毁（与用户关窗同一条路径）
+            const settingDialog = window.siyuan.dialogs.find((item) => item.element.contains(managerButton));
+            openButtonBlockManager(this.context, {
+                onLocate: () => settingDialog?.destroy(),
+            });
+        });
         this.setting = new Setting({
             confirmCallback: () => {
                 // 保存按钮不等待回调：这里自己把结果落盘、必要时提示
@@ -231,6 +244,11 @@ export default class ButtonInSiYuan extends Plugin {
                 skillSwitch.checked = this.settings.agentSkill;
                 return skillSwitch;
             },
+        });
+        this.setting.addItem({
+            title: i18n.manageButtonBlocks,
+            description: i18n.manageButtonBlocksTip,
+            createActionElement: () => managerButton,
         });
         this.setting.addItem({
             title: i18n.settingsDownloadSkill,

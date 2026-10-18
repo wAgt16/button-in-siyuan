@@ -35,7 +35,9 @@
   `fn__size200` 的固定宽度改成宽度下限（文档里的自定义块用的是编辑器字号）。
 * **按钮颜色**：存了颜色才加 `bis-button-color` 类并设 `--bis-button-color`，不存就与原生
   `.b3-button--outline` 逐像素一致。色板全走主题变量（换明暗主题会跟着变），因此不提供任意取色；编号跳过
-  13（daylight 下等于页面底色）与 6（与默认的原生蓝同色）。
+  13（daylight 下等于页面底色）与 6（与默认的原生蓝同色）。**这条规则要同时命中管理窗口里的预览**
+  （`.bis-manager .b3-button.bis-button-color`）：那个窗口不在 `.protyle-wysiwyg` 里，只按块上下文限定会让
+  预览退回原生蓝，与文档里的按钮对不上。
 * **关窗前的「放弃修改」确认**：不是逐条拦取消 / × / `Esc` / 点遮罩，而是把实例上的 `dialog.destroy` 换成
   自己的函数（宿主这四条路最后都调它）。**`disableClose` 只挡遮罩与 ×，挡不住 `Esc`**；判断「有没有改过」
   与保存必须共用同一个 `currentConfig()` 口径，否则会出现「什么都没改也弹确认」。
@@ -69,6 +71,16 @@
   `plugin.loadData`。用户资源目录里的脚本仍要写 `custom-data-assets-button-in-siyuan` 属性，但内核的
   `IsAssetLinkDest` 只认 `assets/` 前缀，所以属性值由 `assetPathOf()` 从完整路径转回 `assets/…`；
   插件 `scripts/` 下的脚本不是资源，属性会被清掉。
+* **按钮块管理**（issue #28）：入口是设置面板里的一个按钮，窗口在 `src/buttonManager.ts`。列表用一条 SQL
+  取 `type = 'custom' AND markdown LIKE ';;;button-in-siyuan/button%'` 的块（显式 `LIMIT`，理由同
+  `assetReference.ts`），逐条过 `parseButtonConfig`，不是本插件配置的块跳过；搜索与操作类型筛选都在内存里
+  做。预览复用 `createButtonElement()`，编辑复用同一个编辑窗口。**块可能没在当前窗口渲染**，保存时
+  `updateButtonContentAsync()` 在拿不到宿主 `setContent` 的情况下回落到 `/api/block/updateBlock`（markdown
+  围栏整体替换，块 ID 不变）；编辑窗口关闭后管理器重新查询一次列表。
+* **在文档中定位**：跳转走 `siyuan://blocks/<id>`（宿主的 `processSiYuanUri` 负责打开所在文档、滚动到块并
+  高亮），但**跳转前要先关掉管理窗口与设置面板**：管理窗口自己 `destroy()`，设置面板由入口通过
+  `IButtonBlockManagerOptions.onLocate` 关 —— 插件拿到的 `siyuan` 类型里 `Setting` 还没有 `close()`，入口按
+  实例从 `window.siyuan.dialogs` 里找回那个面板再 `destroy()`（与用户关窗同一条路径），否则文档上会压着两层窗口。
 * **编辑窗口的运行与删除**（issue #27）：左下角两个纯图标按钮，运行用 `runAction()` 走与点击按钮块同一条
   路径（表单当前值，不要求先保存；链接、内联脚本、脚本文件都一样），删除走 `/api/block/deleteBlock` 并
   先二次确认。删除成功后把 `saved` 置真再关窗，避免「放弃修改」再拦一次；笔记锁定时只禁用删除，运行照旧，

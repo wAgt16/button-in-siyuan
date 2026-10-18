@@ -1,9 +1,10 @@
-import {showMessage} from "siyuan";
+import {fetchSyncPost, showMessage} from "siyuan";
 import type {IContext} from "./context";
 import {createIconElement} from "./icon";
 import {createLogger} from "./logger";
 import {bindMobileSwipe} from "./mobileSwipe";
 import {openLink} from "./openLink";
+import {PLUGIN_NAME} from "./pluginPaths";
 import {isRemoteScript, loadActionScript} from "./scriptFile";
 import {runScript} from "./scriptRunner";
 
@@ -117,6 +118,65 @@ export const updateButtonContent = (blockID: string, config: IButtonConfig) => {
     return written;
 };
 
+/** 块信息的字面量：插件名与块类型都用 encodeURIComponent 编过（这里两者都不含特殊字符）。 */
+const BUTTON_BLOCK_INFO = `${PLUGIN_NAME}/${BUTTON_BLOCK_TYPE}`;
+
+/**
+ * 写回按钮块配置，块不在当前窗口渲染时改走内核的 `/api/block/updateBlock`（issue #28）。
+ *
+ * 管理器里能编辑任何文档中的按钮块，那些块多半没有渲染，`updateButtonContent` 拿不到宿主给的
+ * `setContent`。内核接口按 markdown 整体替换块内容，打开的编辑器会随事务刷新；块 ID 保持不变。
+ */
+export const updateButtonContentAsync = async (blockID: string, config: IButtonConfig) => {
+    if (updateButtonContent(blockID, config)) {
+        return true;
+    }
+    const markdown = `;;;${BUTTON_BLOCK_INFO}\n${serializeButtonConfig(config)}\n;;;`;
+    try {
+        const response = await fetchSyncPost("/api/block/updateBlock", {
+            id: blockID,
+            dataType: "markdown",
+            data: markdown,
+        }, undefined, false);
+        if (response.code !== 0) {
+            log.warn("failed to update the button block through the kernel", {
+                blockID,
+                code: response.code,
+                msg: response.msg,
+            });
+            return false;
+        }
+        log.info("updated the button block through the kernel", {blockID});
+        return true;
+    } catch (error) {
+        log.warn("cannot update the button block through the kernel", {blockID, error});
+        return false;
+    }
+};
+
+/**
+ * 按配置造一个思源原生按钮（不含点击行为）。按钮块的渲染、管理器预览与顶栏快捷按钮共用这一处，
+ * 颜色、图标与文本的口径不会各自漂移。
+ */
+export const createButtonElement = (context: IContext, config: IButtonConfig) => {
+    // 与思源原生按钮完全一致的类名（设置面板里的 b3-button b3-button--outline fn__size200）：
+    // 宽度、字号、悬浮与按下效果全部由思源自己的 CSS 提供，插件不再自定义按钮外观
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "b3-button b3-button--outline fn__size200";
+    // 自定义颜色：只把颜色变量交给 index.scss 里的规则去覆写线框、文本与图标；
+    // 没有设置颜色时连类名都不加，保证默认与思源原生按钮逐像素一致
+    if (config.color) {
+        button.classList.add("bis-button-color");
+        button.style.setProperty("--bis-button-color", `var(--b3-font-color${config.color})`);
+    }
+    button.textContent = config.text || context.i18n.defaultButtonText;
+    if (config.icon) {
+        button.prepend(createIconElement(config.icon));
+    }
+    return button;
+};
+
 /**
  * JavaScript 文件操作：先把文件取回来（本地文件读内核、云端地址现下载），再交给与内联脚本
  * 完全同一条执行与展示路径。文件取不到时不执行任何代码，只给一条提示。
@@ -225,21 +285,7 @@ export const renderButtonBlock = (context: IContext, options: {
         action: config.action?.type || "none",
         hasSetter: Boolean(blockID),
     });
-    const button = document.createElement("button");
-    button.type = "button";
-    // 与思源原生按钮完全一致的类名（设置面板里的 b3-button b3-button--outline fn__size200）：
-    // 宽度、字号、悬浮与按下效果全部由思源自己的 CSS 提供，插件不再自定义按钮外观
-    button.className = "b3-button b3-button--outline fn__size200";
-    // 自定义颜色：只把颜色变量交给 index.scss 里的规则去覆写线框、文本与图标；
-    // 没有设置颜色时连类名都不加，保证默认与思源原生按钮逐像素一致
-    if (config.color) {
-        button.classList.add("bis-button-color");
-        button.style.setProperty("--bis-button-color", `var(--b3-font-color${config.color})`);
-    }
-    button.textContent = config.text || context.i18n.defaultButtonText;
-    if (config.icon) {
-        button.prepend(createIconElement(config.icon));
-    }
+    const button = createButtonElement(context, config);
     const click = (event: MouseEvent) => {
         if (suppressClick) {
             // 移动端长按之后浏览器还会补一次 click，这次不该再执行按钮操作

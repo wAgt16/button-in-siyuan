@@ -11,7 +11,10 @@
 // 按钮块的自定义颜色：线框（思源用 box-shadow 而不是 border 画描边）、文本与图标共用
 // 同一个颜色变量。没有 .bis-button-color 类时不写任何样式，保持原生蓝的 .b3-button--outline；
 // 悬浮底色用 color-mix 取该颜色的淡色，与原生 outline 的 --b3-theme-primary-lightest 同一个观感。
-.protyle-wysiwyg [data-type="NodeCustomBlock"][data-info^="button-in-siyuan"] .b3-button.bis-button-color {
+// 按钮块与管理窗口的预览共用这一套：管理窗口不在 .protyle-wysiwyg 里，只按块上下文限定会让预览
+// 退回原生蓝，与文档里的按钮颜色对不上。类名是插件自己加的，放宽作用域不会波及别的按钮。
+.protyle-wysiwyg [data-type="NodeCustomBlock"][data-info^="button-in-siyuan"] .b3-button.bis-button-color,
+.bis-manager .b3-button.bis-button-color {
     color: var(--bis-button-color);
     box-shadow: inset 0 0 0 .6px var(--bis-button-color);
 

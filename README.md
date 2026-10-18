@@ -58,6 +58,7 @@ Requires SiYuan 3.8.6 or later.
 | Debug mode | Off by default: turns on the plugin's own logs (loading, dialogs, failures) in the SiYuan console, plus the script's `console.debug` output (console and result dialog). Off means the plugin prints nothing, and the console only carries what the script itself logs. |
 | JavaScript editor line wrap | Whether content wider than the editor wraps: `Follow SiYuan` (default, the same as <kbd>Settings</kbd> > <kbd>Editor</kbd> > <kbd>Code block wraps</kbd>), `On`, `Off`. |
 | JavaScript editor ligatures | Whether the editor shows ligatures (the code font has to bring them): `Follow SiYuan` (default, the same as <kbd>Settings</kbd> > <kbd>Editor</kbd> > <kbd>Code block ligature</kbd>), `On`, `Off`. |
+| Button block manager | Lists every button block in the workspace in a separate window, searchable by text, link, script path or document and filterable by action type; pick one to preview its look and action summary, then edit it or locate it in the document (locating closes the manager and the settings panel first, then opens the document with the block highlighted). |
 | Provide the button block skill to the agent | On by default: writes a skill explaining button blocks into the workspace skill directory; switching it off deletes that skill. |
 | Download the skill | The "Download skill" button saves the whole skill as one zip file through SiYuan's own save dialog. |
 
