@@ -14,6 +14,8 @@
 * `docs/*.md` 的代码块语言统一写 `javascript`，`js` 之类会被 `scripts/check-docs.mjs` 拦下。
 * 加文案键要同时改 `src/i18n/en.json`、`src/i18n/zh-CN.json` 与 `src/i18nKeys.ts`，
   `scripts/check-i18n.mjs` 要求两份同键、非空。
+* **文案风格**：客观、技术化、尽量短。目录、字段名、限制条件直接写出来，不要「点一下」「一直以来」这类
+  口语与冗余说明；同类失败提示统一写成「…失败，详见控制台」，不重复解释调试模式（那条规则只在设置项里写一次）。
 * 打开 `assets/…` 前先按宿主的 `isPreviewableAsset` 判断：不能建页签的资源交给内核
   `openPath` 通道；**不要用 `window.open`** —— 会被浏览器类插件接管，而 `wnd.addTab(undefined)`
   会弄坏页签布局。
