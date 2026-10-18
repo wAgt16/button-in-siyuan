@@ -38,7 +38,7 @@ export const openScriptFileEditor = async (context: IContext, options: {
         width: "min(880px, 92vw)",
         height: "min(84vh, 720px)",
         content: `<div class="b3-dialog__content" data-bis="editor-body">
-    <div class="ft__on-surface ft__breakword fn__none" data-bis="readonly-tip">${i18n.readonlyPreviewTip}</div>
+    <div class="ft__on-surface ft__breakword fn__none" data-bis="readonly-tip"><strong>${i18n.readonlyPreviewTip}</strong></div>
     <div data-bis="file-editor"></div>
     <div class="fn__hr--small"></div>
     <button type="button" class="bis-docs-link" data-bis="docs">${i18n.scriptDocs}</button>

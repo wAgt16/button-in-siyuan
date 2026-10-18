@@ -146,7 +146,7 @@ export const openButtonBlockEditor = (context: IContext, options: {
         // 比原来的 640px 宽一圈；宽度用 min() 收在视口内（思源自己也给容器留了 88vw 的上限）
         width: "min(760px, 92vw)",
         content: `<div class="b3-dialog__content" data-bis="editor-body">
-    <div class="ft__on-surface ft__breakword fn__none" data-bis="readonly-tip">${i18n.readonlyPreviewTip}</div>
+    <div class="ft__on-surface ft__breakword fn__none" data-bis="readonly-tip"><strong>${i18n.readonlyPreviewTip}</strong></div>
     <div class="ft__on-surface">${i18n.buttonText}</div>
     <div class="fn__hr--small"></div>
     <input class="b3-text-field fn__block" data-bis="text" spellcheck="false" placeholder="${i18n.defaultButtonText}">
