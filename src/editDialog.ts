@@ -1,4 +1,4 @@
-import {confirm, Dialog, openInputDialog, showMessage} from "siyuan";
+import {confirm, Dialog, showMessage} from "siyuan";
 import {setAssetReference} from "./assetReference";
 import {useBottomSheet} from "./bottomSheet";
 import type {IButtonConfig, TButtonAction} from "./buttonBlock";
@@ -9,17 +9,13 @@ import {guardUnsavedChanges} from "./discardChanges";
 import {createIconElement, openIconPicker} from "./icon";
 import {createLogger} from "./logger";
 import {
-    ASSET_PREFIX,
     downloadScriptToAssets,
-    isLocalScript,
     isRemoteScript,
+    normalizeScriptPath,
     removeWorkspaceFile,
-    renameWorkspaceFile,
-    toAssetScriptPath,
-    workspaceFileExists,
-    writeWorkspaceFile,
 } from "./scriptFile";
 import {openScriptFileEditor} from "./scriptFileDialog";
+import {openScriptFileInfo} from "./scriptFileInfo";
 import {openScriptDocs} from "./scriptDocs";
 
 const log = createLogger("editDialog");
@@ -88,33 +84,6 @@ const askAboutRemoteScript = (context: IContext, url: string) => new Promise<str
         }
     });
 });
-
-/**
- * 在新建脚本文件的输入框后面补一个固定的 `.js`：用户只填文件名，后缀由 `toAssetScriptPath` 补全。
- *
- * 宿主的 `openInputDialog` 没有后缀槽位（`extraContent` 只能放在输入框下方），所以这里把它的输入框
- * 挪进一个 `fn__flex` 行里、后面挂上后缀；宿主的实现会在返回前聚焦并全选输入框，插件不要这个效果，
- * 所以最后把它 blur 掉（挪动本来也会失焦，这里只是不把焦点找回来）。
- */
-const appendScriptFileSuffix = (dialog: Dialog) => {
-    const input = dialog.element.querySelector<HTMLInputElement>("[data-dialog-input]");
-    if (!input) {
-        log.warn("the input dialog has no input element, leaving the .js suffix out");
-        return;
-    }
-    const row = document.createElement("div");
-    row.className = "fn__flex";
-    const space = document.createElement("div");
-    space.className = "fn__space";
-    const suffix = document.createElement("span");
-    suffix.className = "ft__on-surface fn__flex-center";
-    suffix.textContent = ".js";
-    input.before(row);
-    // fn__block 的 100% 宽度在 flex 行里会把后缀挤出容器，换成 fn__flex-1
-    input.classList.replace("fn__block", "fn__flex-1");
-    row.append(input, space, suffix);
-    input.blur();
-};
 
 /** 打开「编辑按钮块」对话框，确定后由宿主的自定义块渲染器写回并重新渲染。 */
 export const openButtonBlockEditor = (context: IContext, options: {
@@ -205,7 +174,7 @@ export const openButtonBlockEditor = (context: IContext, options: {
             <div class="fn__space"></div>
             <button type="button" class="b3-button b3-button--outline b3-button--icon b3-tooltips b3-tooltips__n" data-bis="file-edit" aria-label="${i18n.scriptFileEdit}"><svg class="svg"><use xlink:href="#iconCode"></use></svg></button>
             <div class="fn__space"></div>
-            <button type="button" class="b3-button b3-button--outline b3-button--icon b3-tooltips b3-tooltips__n" data-bis="file-rename" aria-label="${i18n.scriptFileRename}"><svg class="svg"><use xlink:href="#iconEdit"></use></svg></button>
+            <button type="button" class="b3-button b3-button--outline b3-button--icon b3-tooltips b3-tooltips__n" data-bis="file-info" aria-label="${i18n.scriptFileInfo}"><svg class="svg"><use xlink:href="#iconEdit"></use></svg></button>
             <div class="fn__space"></div>
             <button type="button" class="b3-button b3-button--outline b3-button--icon b3-tooltips b3-tooltips__n" data-bis="file-remove" aria-label="${i18n.scriptFileRemove}"><svg class="svg"><use xlink:href="#iconTrashcan"></use></svg></button>
         </div>
@@ -306,7 +275,9 @@ export const openButtonBlockEditor = (context: IContext, options: {
         } else if (actionElement.value === "script") {
             action = {type: "script", script: scriptEditor.getValue()};
         } else if (actionElement.value === "file") {
-            action = {type: "file", file: fileElement.value.trim()};
+            const raw = fileElement.value.trim();
+            // 本地脚本一律存成从工作空间根开始的完整路径；旧格式由 normalizeScriptPath 升级
+            action = {type: "file", file: isRemoteScript(raw) ? raw : normalizeScriptPath(raw) || raw};
         }
         return {
             text: textElement.value.trim() || i18n.defaultButtonText,
@@ -319,7 +290,10 @@ export const openButtonBlockEditor = (context: IContext, options: {
     textElement.value = config.text;
     actionElement.value = config.action?.type || "";
     linkElement.value = config.action?.type === "link" ? config.action.link : "";
-    fileElement.value = config.action?.type === "file" ? config.action.file : "";
+    // 旧按钮里存的是 `assets/x.js`（相对数据目录），打开时直接显示升级后的完整路径；
+    // 云端地址没有本地目录概念，原样保留
+    const initialFile = config.action?.type === "file" ? config.action.file : "";
+    fileElement.value = isRemoteScript(initialFile) ? initialFile : normalizeScriptPath(initialFile) || initialFile;
     updateIconElement();
     updateColorElement();
     updateActionFields();
@@ -332,7 +306,7 @@ export const openButtonBlockEditor = (context: IContext, options: {
         fileElement.readOnly = true;
         iconElement.disabled = true;
         // 脚本文件的四个按钮里只有「编辑」留到预览模式（下面单独放行）：它打开的是只读窗口，不写盘
-        ["file-create", "file-rename", "file-remove"].forEach((type) => {
+        ["file-create", "file-info", "file-remove"].forEach((type) => {
             field<HTMLButtonElement>(type).disabled = true;
         });
         dialog.element.querySelector('[data-bis="readonly-tip"]')?.classList.remove("fn__none");
@@ -362,32 +336,15 @@ export const openButtonBlockEditor = (context: IContext, options: {
         log.debug("cleared the button icon");
     });
     /**
-     * 取输入框里的本地脚本路径。云端地址与空值都只提示不动作：编辑、重命名、删除只对
-     * assets/ 下的 .js 文件开放（云端文件插件没有权限也不该改）。
+     * 取输入框里的本地脚本路径（规范成工作空间相对路径）。云端地址与空值都只提示不动作：
+     * 编辑代码、编辑文件信息、删除只对两个脚本目录下的 .js 文件开放（云端文件插件没有权限也不该改）。
      */
     const localScriptPath = () => {
-        const path = fileElement.value.trim();
-        if (!isLocalScript(path)) {
-            log.warn("the script file action needs a local assets/ script", {path});
+        const path = normalizeScriptPath(fileElement.value);
+        if (!path) {
+            log.warn("the script file action needs a local script", {value: fileElement.value});
             showMessage(i18n.scriptFileNeeded);
             fileElement.focus();
-            return;
-        }
-        return path;
-    };
-    /**
-     * 新建/重命名输入框里的名字 → assets/ 下的脚本路径。新建窗口的输入框后面固定显示 `.js`，
-     * 用户只填文件名；空名字与非法名字分别提示，都留在窗口里继续改。
-     */
-    const newScriptPath = (value: string) => {
-        if (!value.trim()) {
-            log.warn("the script file name is empty");
-            showMessage(i18n.scriptFileNameRequired);
-            return;
-        }
-        const path = toAssetScriptPath(value);
-        if (!path) {
-            showMessage(i18n.scriptFileInvalidName);
             return;
         }
         return path;
@@ -397,32 +354,12 @@ export const openButtonBlockEditor = (context: IContext, options: {
         showMessage(error instanceof Error && error.message ? error.message : i18n.scriptFileFailed);
     };
     field<HTMLButtonElement>("file-create").addEventListener("click", () => {
-        const dialog = openInputDialog({
-            title: i18n.scriptFileCreateTitle,
-            label: i18n.scriptFileName,
-            // 不预填：让用户自己起名，扩展名由输入框后面的固定后缀给出
-            value: "",
-            onConfirm: async (value, inputDialog) => {
-                const path = newScriptPath(value);
-                if (!path) {
-                    return;
-                }
-                try {
-                    if (await workspaceFileExists(path)) {
-                        showMessage(i18n.scriptFileExists);
-                        return;
-                    }
-                    await writeWorkspaceFile(path, "");
-                } catch (error) {
-                    reportScriptFailure(error, {path, action: "create"});
-                    return;
-                }
+        openScriptFileInfo(context, {
+            mode: "create",
+            onSaved: (path) => {
                 fileElement.value = path;
-                log.info("created a script file", {path});
-                inputDialog.destroy();
             },
         });
-        appendScriptFileSuffix(dialog);
     });
     field<HTMLButtonElement>("file-edit").addEventListener("click", () => {
         // 这一条在预览模式下也留着：脚本文件窗口是只读的，看一眼文件内容不会改动任何东西
@@ -431,41 +368,19 @@ export const openButtonBlockEditor = (context: IContext, options: {
             void openScriptFileEditor(context, {path, editable});
         }
     });
-    field<HTMLButtonElement>("file-rename").addEventListener("click", () => {
+    field<HTMLButtonElement>("file-info").addEventListener("click", () => {
+        // 改名与移动共用一个窗口：位置可以换到 assets/ 或插件的 scripts/，名字一起改也行
         const path = localScriptPath();
         if (!path) {
             return;
         }
-        const dialog = openInputDialog({
-            title: i18n.scriptFileRenameTitle,
-            label: i18n.scriptFileName,
-            // 与新建窗口一致：只填名字，扩展名由输入框后面的固定后缀给出
-            value: path.substring(ASSET_PREFIX.length).replace(/\.js$/i, ""),
-            onConfirm: async (value, inputDialog) => {
-                const next = newScriptPath(value);
-                if (!next) {
-                    return;
-                }
-                if (next === path) {
-                    inputDialog.destroy();
-                    return;
-                }
-                try {
-                    if (await workspaceFileExists(next)) {
-                        showMessage(i18n.scriptFileExists);
-                        return;
-                    }
-                    await renameWorkspaceFile(path, next);
-                } catch (error) {
-                    reportScriptFailure(error, {path, next, action: "rename"});
-                    return;
-                }
+        openScriptFileInfo(context, {
+            mode: "edit",
+            path,
+            onSaved: (next) => {
                 fileElement.value = next;
-                log.info("renamed a script file", {path, next});
-                inputDialog.destroy();
             },
         });
-        appendScriptFileSuffix(dialog);
     });
     field<HTMLButtonElement>("file-remove").addEventListener("click", () => {
         const path = localScriptPath();
@@ -522,6 +437,17 @@ export const openButtonBlockEditor = (context: IContext, options: {
                 showMessage(i18n.scriptFileNeeded);
                 fileElement.focus();
                 return;
+            }
+            if (!isRemoteScript(path)) {
+                const normalized = normalizeScriptPath(path);
+                if (!normalized) {
+                    log.warn("save rejected: the script file path is not in a managed directory", {blockID, path});
+                    showMessage(i18n.scriptFileNeeded);
+                    fileElement.focus();
+                    return;
+                }
+                // 旧格式（assets/…）在这里升级成完整路径，按钮里从此只存一种形式
+                fileElement.value = normalized;
             }
             if (isRemoteScript(path)) {
                 const accepted = await askAboutRemoteScript(context, path);

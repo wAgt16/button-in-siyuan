@@ -3,7 +3,8 @@ import type {IButtonConfig} from "./buttonBlock";
 import {parseButtonConfig} from "./buttonBlock";
 import type {IContext} from "./context";
 import {createLogger} from "./logger";
-import {isLocalScript} from "./scriptFile";
+import {ASSET_SCRIPT_DIR} from "./pluginPaths";
+import {normalizeScriptPath} from "./scriptFile";
 
 const log = createLogger("assetReference");
 
@@ -21,10 +22,21 @@ const log = createLogger("assetReference");
  */
 export const ASSET_REFERENCE_ATTR = "custom-data-assets-button-in-siyuan";
 
-/** 按钮块配置里要记在属性上的资源路径：只有本地 assets/ 脚本文件才需要记（云端地址与别的操作都不需要）。 */
+/**
+ * 按钮块配置里要记在属性上的资源路径。
+ *
+ * 只有放在用户资源目录里的脚本需要记：内核的 `getAssetsLinkDests` 只认 `assets/` 开头的属性值
+ * （kernel/util/path.go 的 `IsAssetLinkDest`），所以按钮里存的完整路径 `data/assets/x.js` 要转回
+ * `assets/x.js` 再写进属性。插件 `scripts/` 目录下的脚本不参与资源清理，不需要引用属性（返回
+ * undefined 会清掉旧值，正好覆盖「从 assets/ 移到 scripts/」的情况）。
+ */
 const assetPathOf = (config: IButtonConfig | undefined) => {
     const action = config?.action;
-    return action?.type === "file" && isLocalScript(action.file) ? action.file : undefined;
+    if (action?.type !== "file") {
+        return;
+    }
+    const path = normalizeScriptPath(action.file);
+    return path?.startsWith(ASSET_SCRIPT_DIR) ? path.substring("data/".length) : undefined;
 };
 
 /** 写入/清除块上的资源引用属性；path 为空表示清除（空值就是删除这个属性）。 */

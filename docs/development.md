@@ -56,12 +56,15 @@
 * **JavaScript 文件操作**：每次点击都重新取代码（本地走 `/api/file/getFile`，云端重新下载）再交给同一个
   `runScript`，取不到只提示、不执行。**这几个内核文件接口没有用宿主的 `fetchPost`**：`getFile` 成功时回裸
   字节、出错才是 JSON 信封，而宿主对 `code < 0` 只弹提示、不调回调，403/404 拿不到 —— 那正是判断「文件
-  不存在」要用的；写接口用 `fetchSyncPost` 并关掉 `processMessage`。**按钮里存的 `assets/xxx.js` 不能直接
-  喂给 `/api/file/*`**：`assets/…` 相对的是数据目录，而文件接口的 path 相对工作空间根，所以统一用
-  `toWorkspacePath()` 补 `data/` 前缀；少了它文件会落到工作空间根下另建的 `assets/`，插件自己读写正常，
-  但那个目录不在数据目录里，不进资源索引，也不会同步。**云端脚本必须二次确认**（可放弃 / 直接使用 / 下载到
-  `assets/` 之后与云端再无关系）；只有本地文件才提供编辑、改名、删除；脚本文件读写一律不走
-  `plugin.loadData`。
+  不存在」要用的；写接口用 `fetchSyncPost` 并关掉 `processMessage`。**按钮里的 `file` 字段从 issue #20 起
+  统一存工作空间相对路径**：`data/assets/x.js` 或 `data/storage/petal/button-in-siyuan/scripts/x.js`，
+  与 `/api/file/*` 和 Agent 的 `file` 工具同一个口径；旧按钮里的 `assets/x.js` 由 `normalizeScriptPath()`
+  补成 `data/assets/x.js` 继续读取，编辑保存时升级。路径只允许落在这两个脚本目录（`src/pluginPaths.ts`），
+  不在别处读写 `.js`。**云端脚本必须二次确认**（可放弃 / 直接使用 / 下载到 `data/assets/` 之后与云端再无
+  关系）；只有本地文件才提供编辑代码、编辑文件信息（改名 / 移动）与删除；脚本文件读写一律不走
+  `plugin.loadData`。用户资源目录里的脚本仍要写 `custom-data-assets-button-in-siyuan` 属性，但内核的
+  `IsAssetLinkDest` 只认 `assets/` 前缀，所以属性值由 `assetPathOf()` 从完整路径转回 `assets/…`；
+  插件 `scripts/` 下的脚本不是资源，属性会被清掉。
 * **链接操作**（`src/openLink.ts`）：效果要与文档里点 `[]()` 链接一致，即对齐宿主的
   `app/src/editor/openLink.ts`。非本地地址一律交给 `platformUtils.openByMobile`（宿主用的同一个函数，
   `siyuan://` 与插件事件也在里面处理）；本地路径按 `window.siyuan.config.editor.assetOpen` 算动作，移动端
@@ -77,9 +80,10 @@
   的块与同步过来的文档都不经过编辑窗口，只有渲染器当场看得见）、插件加载时整库补一次
   （`syncAssetReferences()` 与 `ial` 比对，只在不一致时写回）。`syncAssetReferences()` 里那条 SQL 必须带
   显式 `LIMIT`：内核给 `/api/query/sql` 套了用户设置的搜索条数上限（默认 64），不写会被静默截断。**导出时
-  只在收集原始树资源的格式里生效**：HTML 与 Word 会把脚本按相对路径复制到导出目录的 `assets/` 下；
-  Markdown `.zip` 与 Pandoc 是导出后重新解析正文再收集，块属性已经丢掉，所以 `.zip` 里没有脚本文件
-  （README 的「限制」写明了）；`.sy.zip` 按思源自身的设计不带资源。
+  只在收集原始树资源的格式里生效**：HTML 与 Word 会把资源目录里的脚本按相对路径复制到导出目录的 `assets/`
+  下；插件 `scripts/` 下的脚本不是资源，任何导出都不会带走它。Markdown `.zip` 与 Pandoc 是导出后重新解析
+  正文再收集，块属性已经丢掉，所以 `.zip` 里也没有 `data/assets/` 的脚本（README 的「限制」写明了）；
+  `.sy.zip` 按思源自身的设计不带资源。
 * **Agent 技能**：技能是**一个目录**，由 `src/agentSkill.ts` 写成
   `data/storage/ai/agent/skills/button-block/`：正文来自 `docs/skill.md`，两份参考文档来自
   `docs/javascript.md` 与 `docs/icons.md`。正文走内核的 `/api/ai/agent/saveSkill`（它只肯写 `SKILL.md`，

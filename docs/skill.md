@@ -61,7 +61,8 @@ the block type, with a **single-line JSON payload** as its body (in the database
 | --- | --- |
 | `{"type":"link","link":"…"}` | Opens the address the way SiYuan opens a link in a document: `https://…`, `mailto:…` and other schemes go to the system, `siyuan://blocks/<block ID>` (also `siyuan://plugins|bazaar/…`) is handled by SiYuan itself, and a local `assets/<path>` follows the user's "Resource opening" setting. |
 | `{"type":"script","script":"…"}` | Runs the code inline in the SiYuan frontend page, wrapped in an async function (`await` and `return` work). Suits roughly a dozen lines. |
-| `{"type":"file","file":"assets/my-script.js"}` | Runs a JavaScript file under `assets/`, read again on every click. Maintain it with the `file` tool — see the path note below. |
+| `{"type":"file","file":"data/assets/my-script.js"}` | Runs a local JavaScript file from the asset directory, read again on every click. Maintain it with the `file` tool — see the path note below. |
+| `{"type":"file","file":"data/storage/petal/button-in-siyuan/scripts/my-script.js"}` | Same, but the file lives in the plugin's own `scripts/` directory instead of the user's asset directory. The plugin's editor creates new files here by default. |
 | `{"type":"file","file":"https://example.com/x.js"}` | Downloads and runs that URL on every click. Prefer a local file: the remote content can change unnoticed, and the script can read and write the user's notes. |
 
 Write the payload as one line of JSON — that is what the plugin's editor always does, and the only hard rule is
@@ -69,27 +70,24 @@ that no line of the block content may be exactly `;;;`. Content that is not vali
 the fields above, is *not* treated as a button block: the plugin renders it as raw text and offers no edit
 entry, so never store anything else in this block type.
 
-### Asset paths: `assets/…` in the payload, `data/assets/…` in your tools
+### Script paths are workspace paths
 
-A script file is named in two different ways, and mixing them up does not fail loudly — it writes to the
-wrong directory:
+The `file` field of the payload uses **the same path form as the `file` tool and `/api/file/*`**: a full path
+from the workspace root. There are exactly two directories the plugin manages and offers create / edit / move /
+delete for:
 
-| Where | Path | Relative to |
+| Directory | Example value of `file` | Why choose it |
 | --- | --- | --- |
-| The `file` field of the payload, and every asset link inside a document | `assets/my-script.js` | the data directory (`data/`) |
-| The `file` tool (`read` / `write` / `rename` / `delete` / `stat`) and `/api/file/*` | `data/assets/my-script.js` | the workspace root |
+| Asset directory | `data/assets/my-script.js` | The file is indexed as a SiYuan asset, follows asset sync, and the plugin marks it on the block with `custom-data-assets-button-in-siyuan` so "clean unreferenced assets" leaves it alone. |
+| Plugin `scripts/` | `data/storage/petal/button-in-siyuan/scripts/my-script.js` | Keeps the user's asset directory clean; still inside `data/`, so it is synced with the workspace. Not an asset, so it has no reference attribute. |
 
-So the file the payload calls `assets/my-script.js` is `data/assets/my-script.js` for every tool you use to
-touch it, and keep a local `file` value to `assets/<name>.js`: the plugin resolves it under the data directory,
-and it only offers create, edit, rename and delete for `assets/` `.js` files. A local `assets/` script file a
-button uses is also marked on the block with the `custom-data-assets-button-in-siyuan` attribute, so SiYuan
-counts it as referenced and never offers it for cleanup (a remote URL is not marked); the plugin maintains that
-attribute itself, just do not remove it. If you write through `/api/file/putFile` with the payload form
-(`assets/my-script.js`), the kernel happily creates a second `assets/` directory at the workspace root — and the
-button then breaks: the plugin resolves the payload path against `data/`, so it looks for
-`data/assets/my-script.js`, fails to load the script and only shows a toast on every click. A file outside
-`data/` is also neither indexed by SiYuan nor synced, so a button whose script file lives there stays on one
-device. When a button's script file cannot be found, check this first.
+An old button may still carry `assets/my-script.js`, which the plugin reads as `data/assets/my-script.js`;
+do not write that short form yourself. If you write through `/api/file/putFile`, use the full workspace path —
+the short form creates a second `assets/` directory at the workspace root, where the button will never find it
+and where SiYuan neither indexes nor syncs it. When a button's script file cannot be found, check the path
+first. For an asset-directory file, the block attribute holds `assets/my-script.js` (the kernel's asset scanner
+only recognizes that prefix), while the payload holds `data/assets/my-script.js`; the plugin maintains that
+attribute itself, just do not remove it.
 
 Creating or editing these files with the `file` tool makes the user confirm each write, and SiYuan describes
 that tool as debugging and log reading only: use it for script files, nothing else in the workspace.

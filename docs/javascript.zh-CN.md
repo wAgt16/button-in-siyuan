@@ -8,8 +8,9 @@
 ## 1. 脚本是怎么执行的
 
 - **触发时机**：点击按钮时执行。
-- **代码从哪来**：直接写在按钮里，或让按钮操作指向「JavaScript 文件」（`assets/` 下的本地文件，或 http(s) 地址）；
-  后者每次点击都重新读文件，改文件就等于改按钮行为。
+- **代码从哪来**：直接写在按钮里，或让按钮操作指向「JavaScript 文件」（本地 `.js` 文件，或 http(s) 地址）；
+  本地文件放在 `data/assets/`（资源目录）或插件的 `data/storage/petal/button-in-siyuan/scripts/` 下，
+  路径统一写成**从工作空间根开始的完整相对路径**。后者每次点击都重新读文件，改文件就等于改按钮行为。
 - **async 包装**：整段代码被包进 async 函数，可以直接 `await`，也可以用 `return` 结束。
 - **输出**：`return` 的值、`console.log / info / debug / warn / error / table / dir` 的输出和抛出的错误都显示在结果弹窗里，
   弹窗可一键复制纯文本，console 输出同时由插件原样转交思源控制台（`console.debug` 只在插件设置里打开「调试模式」后才有输出）；

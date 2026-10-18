@@ -34,13 +34,15 @@ export type II18n = {
     scriptFileTip: string;
     scriptFileCreate: string;
     scriptFileEdit: string;
-    scriptFileRename: string;
+    scriptFileInfo: string;
     scriptFileRemove: string;
     scriptFileCreateTitle: string;
-    scriptFileRenameTitle: string;
+    scriptFileInfoTitle: string;
+    scriptFileLocation: string;
+    scriptFileLocationPlugin: string;
+    scriptFileLocationAssets: string;
     scriptFileRemoveConfirm: string;
     scriptFileName: string;
-    scriptFileNameRequired: string;
     scriptFileInvalidName: string;
     scriptFileExists: string;
     scriptFileNeeded: string;

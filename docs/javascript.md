@@ -10,8 +10,10 @@ section 3 contains a few full examples.
 
 - **When**: on every click of the button.
 - **Where the code comes from**: written inline in the button, or the button's action points at a "JavaScript
-  file" (a local file under `assets/`, or an http(s) URL). The latter re-reads the file on every click, so
-  editing the file changes the button's behaviour.
+  file" (a local `.js` file, or an http(s) URL). Local files live under `data/assets/` (the asset directory) or
+  under the plugin's `data/storage/petal/button-in-siyuan/scripts/` directory, and their paths are always
+  written from the workspace root. The latter re-reads the file on every click, so editing the file changes the
+  button's behaviour.
 - **async wrapper**: the whole script is wrapped in an async function, so `await` works and `return` ends it.
 - **Output**: the `return` value, whatever `console.log / info / debug / warn / error / table / dir` writes, and
   any thrown error appear in the result dialog, which can copy the text as plain text; the console lines are also

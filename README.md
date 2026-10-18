@@ -16,7 +16,7 @@ Insert native SiYuan buttons into documents, with text, a built-in icon and a li
 * The button colour is optional: the frame, the text and the icon share one colour taken from
   SiYuan's built-in palette; the default stays SiYuan's native blue.
 * A button action is optional and is one of: open a link, run JavaScript, or run a JavaScript file
-  (a local file under `assets/`, or an http(s) address).
+  (a local file under `data/assets/` or the plugin's `scripts/` directory, or an http(s) address).
 * The JavaScript editor is CodeMirror with line numbers, syntax highlighting, bracket matching and
   completion; its colors follow SiYuan's code highlighting scheme.
 
@@ -48,7 +48,7 @@ Requires SiYuan 3.8.6 or later.
 | Button action | `None`, `Open link`, `JavaScript` or `JavaScript file`. Only one action is used. |
 | Link address | Shown for `Open link`; required for that action. |
 | JavaScript code | Shown for `JavaScript`; required for that action. |
-| JavaScript file path | Shown for `JavaScript file`; required for that action. It can be a local `.js` file under `assets/` or an http(s) address. |
+| JavaScript file path | Shown for `JavaScript file`; required for that action. It can be a local `.js` file under `data/assets/` or `data/storage/petal/button-in-siyuan/scripts/`, always named by its full path from the workspace root, or an http(s) address. The "New" button creates a file in either directory; "Edit file info" renames it or moves it between them. |
 
 ## Plugin settings
 
@@ -93,11 +93,12 @@ Full guide with ready-to-paste examples: [docs/javascript.md](./docs/javascript.
 * The plugin is disabled on the publish service (`disabledInPublish`), so published pages show the
   raw block content instead of a button.
 * PDF/HTML export has no custom block renderer: exported documents contain the raw content.
-* For a button whose action runs a JavaScript file, mind the script file itself when exporting: **the HTML
-  and Word exports copy it to `assets/` under the export directory, at the relative path the block
-  references**, while a **Markdown `.zip` does not carry it** (SiYuan collects resources from the exported
-  Markdown text, where block attributes take no part and a plugin cannot hook in). Use the HTML or Word
-  export there, or copy the script along yourself.
+* For a button whose action runs a JavaScript file, mind the script file itself when exporting: **a script
+  under `data/assets/` is copied by the HTML and Word exports to `assets/` under the export directory, at the
+  relative path the block references**, while **a script under the plugin's `scripts/` directory is not an asset
+  and no export carries it**, and a **Markdown `.zip` does not carry `data/assets/` scripts either** (SiYuan
+  collects resources from the exported Markdown text, where block attributes take no part and a plugin cannot
+  hook in). Use the HTML or Word export there, or copy the script along yourself.
 * The JavaScript action is not sandboxed; it runs with the same privileges as the user's own code
   snippets. Only run code you trust.
 * The icon list comes from the icons loaded in the current interface, so a third-party icon package
