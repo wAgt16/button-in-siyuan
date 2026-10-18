@@ -7,13 +7,11 @@ description: Create, edit and debug button blocks - the custom block whose info 
 
 This document is the button block itself: what it is, how its payload is shaped, and how to create, read and
 change one through SiYuan's own tools. The *script* side of the action has its own document,
-`references/javascript.md`, which is written for you and for the user who opens it inside the plugin.
+`references/javascript.md`.
 
 A button block is an ordinary SiYuan **custom block**: the kernel stores it, syncs it, exports it and
-indexes it like any other block, so nothing is lost when the plugin is disabled. Only the *rendering*
-comes from the plugin — with the plugin enabled the block is drawn as a native SiYuan button
-(`b3-button b3-button--outline fn__size200`); with the plugin disabled or removed, SiYuan falls back to
-showing the raw block content in a `<pre>`.
+indexes it like any other block, so nothing is lost when the plugin is disabled. The block content is the
+source of truth; the plugin only renders it.
 
 Do all of this through SiYuan's own tools — the `block` and `sql` tools, or the kernel HTTP API under
 `/api/*`. Never hand-edit `data-content` on a rendered block and never build the button's DOM: the block
@@ -53,28 +51,26 @@ the block type, with a **single-line JSON payload** as its body (in the database
 | Field | Meaning |
 | --- | --- |
 | `text` | Button label. Empty falls back to the plugin's default label. |
-| `icon` | One icon id from `references/icons.md`, for example `iconCirclePlay`. Empty string = no icon. A typo only shows up as a silently missing icon. |
-| `color` | Optional. Index 1–12 of SiYuan's built-in text colours (`--b3-font-colorN`), which colours the frame, the label and the icon together and follows the theme in light and dark mode. Omit it for SiYuan's native blue; the editor's palette offers 1–5 and 7–12, because 6 is that same theme primary colour. |
-| `action` | Optional. Exactly one of the four forms below; omit it for a button that does nothing. |
+| `icon` | One exact id from `references/icons.md`, for example `iconCirclePlay`. Empty string = no icon. An unknown id is silently dropped. |
+| `color` | Optional. Index 1–12 of SiYuan's built-in text colours (`--b3-font-colorN`). Omit it for the theme's primary colour; index 6 equals that colour, so it is indistinguishable from omitting it. |
+| `action` | Optional. Exactly one of the forms below; omit it for a button that does nothing. |
 
 | `action` | Meaning |
 | --- | --- |
 | `{"type":"link","link":"…"}` | Opens the address the way SiYuan opens a link in a document: `https://…`, `mailto:…` and other schemes go to the system, `siyuan://blocks/<block ID>` (also `siyuan://plugins|bazaar/…`) is handled by SiYuan itself, and a local `assets/<path>` follows the user's "Resource opening" setting. |
 | `{"type":"script","script":"…"}` | Runs the code inline in the SiYuan frontend page, wrapped in an async function (`await` and `return` work). Suits roughly a dozen lines. |
 | `{"type":"file","file":"data/assets/my-script.js"}` | Runs a local JavaScript file from the asset directory, read again on every click. Maintain it with the `file` tool — see the path note below. |
-| `{"type":"file","file":"data/storage/petal/button-in-siyuan/scripts/my-script.js"}` | Same, but the file lives in the plugin's own `scripts/` directory instead of the user's asset directory. The plugin's editor creates new files here by default. |
+| `{"type":"file","file":"data/storage/petal/button-in-siyuan/scripts/my-script.js"}` | Same, but the file lives in the plugin's own `scripts/` directory instead of the user's asset directory. |
 | `{"type":"file","file":"https://example.com/x.js"}` | Downloads and runs that URL on every click. Prefer a local file: the remote content can change unnoticed, and the script can read and write the user's notes. |
 
-Write the payload as one line of JSON — that is what the plugin's editor always does, and the only hard rule is
-that no line of the block content may be exactly `;;;`. Content that is not valid JSON, or that carries none of
-the fields above, is *not* treated as a button block: the plugin renders it as raw text and offers no edit
-entry, so never store anything else in this block type.
+Write the payload as one line of JSON. The only hard rule is that no line of the block content may be exactly
+`;;;`. Content that is not valid JSON, or that carries none of the fields above, is *not* a button block, so
+never store anything else in this block type.
 
 ### Script paths are workspace paths
 
 The `file` field of the payload uses **the same path form as the `file` tool and `/api/file/*`**: a full path
-from the workspace root. There are exactly two directories the plugin manages and offers create / edit / move /
-delete for:
+from the workspace root. There are exactly two directories the plugin manages:
 
 | Directory | Example value of `file` | Why choose it |
 | --- | --- | --- |
@@ -89,8 +85,8 @@ first. For an asset-directory file, the block attribute holds `assets/my-script.
 only recognizes that prefix), while the payload holds `data/assets/my-script.js`; the plugin maintains that
 attribute itself, just do not remove it.
 
-Creating or editing these files with the `file` tool makes the user confirm each write, and SiYuan describes
-that tool as debugging and log reading only: use it for script files, nothing else in the workspace.
+SiYuan describes the `file` tool as debugging and log reading only: use it for script files, nothing else in
+the workspace.
 
 ## Creating a button block
 
@@ -127,18 +123,15 @@ Read it back once afterwards: the kernel may normalise content, so confirm what 
 
 ## Top bar quick actions
 
-The top bar has a lightning entry that opens a menu of **quick actions** (on mobile the same entry sits in the
-top bar's Plugins menu). They are actions, not button blocks: the menu only runs them and always ends with a
-"Manage quick actions" item, where you create and edit them (the add icon in the manager's top-right corner) or
-you write the files yourself. They are not blocks and do not live in a document: each one is a JSON file under
+Quick actions are not button blocks and do not live in a document: each one is a JSON file under
 
 ```
 data/storage/petal/button-in-siyuan/topbar/<name>.json
 ```
 
-The menu is built from that directory every time the entry is clicked, so creating or editing a file takes
-effect without reloading the plugin. Files are shown in **file name order**: prefix names with `01-`, `02-` to
-control the order. A file's content is the same payload as a button block, minus `color`:
+The plugin reads that directory on every use, so creating or editing a file takes effect without reloading the
+plugin. Files are used in **file name order**: prefix names with `01-`, `02-` to control the order. A file's
+content is the same payload as a button block, minus `color`:
 
 ```json
 {
@@ -150,19 +143,16 @@ control the order. A file's content is the same payload as a button block, minus
 
 | Field | Meaning |
 | --- | --- |
-| `text` | Menu label. Empty falls back to the plugin's default label. |
-| `icon` | Optional icon id from `references/icons.md`; omit or use `""` for no icon. |
+| `text` | Label. Empty falls back to the plugin's default label. |
+| `icon` | Optional exact id from `references/icons.md`; omit or use `""` for no icon. |
 | `action` | Optional, exactly the same forms as the block payload (`link`, `script`, `file`). |
 
-Quick actions can change their text, icon and action, but not their colour: **`color` is ignored** (the plugin
-drops it when it saves through its own editor), so do not add it. Write the file as one JSON object with
-indentation; invalid JSON or an object with none of `text` / `icon` / `action` is skipped and logged, not shown
-in the menu. Use the `file` tool or `/api/file/putFile` with the full path above; the parent directory is
-created on the first write. Deleting the file removes the action from the menu. The manager lists and previews
-each action by its icon and label only — it deliberately does not render a button block. The manager's editor
-can also create, edit, run and delete these files, and its script action has the same output dialog behaviour
-as a button block — but a quick action has no block context, so in an inline script `blockID` is an empty
-string and `protyle` is `undefined`; use a script file or a link when you need the current document.
+A quick action carries only text, icon and action: **`color` is ignored**, so do not add it. Write the file as
+one JSON object with indentation; invalid JSON, or an object with none of `text` / `icon` / `action`, is skipped
+and logged. Use the `file` tool or `/api/file/putFile` with the full path above; the parent directory is created
+on the first write. Deleting the file removes the action. A quick action has no block context, so in an inline
+script `blockID` is an empty string and `protyle` is `undefined`; use a script file or a link when you need the
+current document.
 
 ## Reporting from a script
 
@@ -171,18 +161,16 @@ channels are available, and they are not interchangeable:
 
 | Channel | What the user gets | Reach for it when |
 | --- | --- | --- |
-| `return <value>` and `console.log / info / debug / warn / error` | The plugin's JavaScript output dialog: every console line, the return value and the thrown error, as copyable plain text. It stays open until it is closed. | You are working the script out and want to see everything it produced, or the value is long. |
-| `showMessage(text, timeout?, type?, id?)` | SiYuan's own toast in the corner; it goes away by itself. | The button will stay on the note: a short confirmation per click, with no window to close. |
+| `return <value>` and `console.log / info / debug / warn / error` | One result window holding every console line, the return value and the thrown error, as copyable plain text. | You are working the script out and want to see everything it produced, or the value is long. |
+| `showMessage(text, timeout?, type?, id?)` | SiYuan's own toast; it goes away by itself. | The button will stay on the note: a short confirmation per click, with no window to close. |
 | `new Dialog({…})` | A window you build yourself. | The click cannot act before it knows something — a question, a few fields, a choice. §3.7 of `references/javascript.md` has a full example. |
 
 There is no default to fall back on: pick the one that fits, and say which one you picked when you report
-back. The plugin's "JavaScript output dialog" setting only decides whether the *output dialog* opens (default
-`With output`: it opens when there is console output, a return value or an error) — a toast and your own
-window are unaffected by it. Console lines also reach the SiYuan console through the plugin; `console.debug`,
-and every log the plugin writes itself, only appear while the plugin's "Debug mode" setting is on.
+back. The result window opens only when the script produces console output, a return value or an error; a toast
+and a window you build yourself are not affected by that rule.
 
-A script can override the dialog policy and restrict where it runs with declarations at the very top, before
-the first line of code:
+A script can override when that window opens and restrict where it runs with declarations at the very top,
+before the first line of code:
 
 ```javascript
 // @bis-output error
@@ -190,12 +178,11 @@ the first line of code:
 // @bis-backends windows, linux, darwin
 ```
 
-`@bis-output` takes the same modes as the plugin setting (`always`, `output`, `console`, `warn`, `error`,
-`never`). `@bis-frontends` / `@bis-backends` take the marketplace plugin values (`all`, `desktop`,
-`desktop-window`, `mobile`, `browser-desktop`, `browser-mobile`; `all`, `windows`, `linux`, `darwin`, `docker`,
-`android`, `ios`, `harmony`), comma- or space-separated. Omitting a declaration means `all`. When the current
-environment is not declared, the button shows a toast and the code does not run, so use it for scripts that
-only make sense on one platform.
+`@bis-output` takes `always`, `output`, `console`, `warn`, `error` or `never`. `@bis-frontends` / `@bis-backends`
+take the marketplace plugin values (`all`, `desktop`, `desktop-window`, `mobile`, `browser-desktop`,
+`browser-mobile`; `all`, `windows`, `linux`, `darwin`, `docker`, `android`, `ios`, `harmony`), comma- or
+space-separated. Omitting a declaration means `all`. When the current environment is not declared, the code does
+not run and the user is told with a toast, so use it for scripts that only make sense on one platform.
 
 ```javascript
 // The usual shape of a finished button: a toast per click, and nothing to close.
@@ -206,15 +193,15 @@ showMessage("done");
 // return "done";
 ```
 
-A thrown error always reaches the output dialog unless the user chose the `Console output only` or `Never`
-policy, so a failure does not go unnoticed.
+A thrown error always reaches the result window unless the script declares the `console` or `never` output
+mode, so a failure does not go unnoticed.
 
 ## Before you report back
 
 - `get_kramdown` gives back the `;;;` fence, the payload line inside it parses with `JSON.parse`, and
   `action.type` is one of `link`, `script`, `file` (and, for `file`, the target really is readable).
 - Every `icon` id exists in `references/icons.md`, and `color`, if present, is an integer between 1 and 12.
-- For a script: you have decided what each click should show — the output dialog while working it out, a toast
+- For a script: you have decided what each click should show — the result window while working it out, a toast
   for a button that stays, your own window when the click needs input (see "Reporting from a script") — rather
   than leaving output that opens a window on every click. A button runs its script on every click, so keep
   writes idempotent, and remind the user to back up before a script that creates or deletes notes. The script
@@ -224,4 +211,3 @@ policy, so a failure does not go unnoticed.
   These files land in `data/storage/petal/button-in-siyuan/storage/`; a plugin storage file has no extension,
   and a bare number or string comes back from `plugin.loadData` as text, so `count + 1` would concatenate
   digits. Older files still at the plugin directory root are migrated on the next read.
-- The click itself can only be confirmed by the user inside SiYuan.

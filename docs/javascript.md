@@ -16,31 +16,30 @@ section 3 contains a few full examples.
   button's behaviour.
 - **async wrapper**: the whole script is wrapped in an async function, so `await` works and `return` ends it.
 - **Output**: the `return` value, whatever `console.log / info / debug / warn / error / table / dir` writes, and
-  any thrown error appear in the result dialog, which can copy the text as plain text; the console lines are also
-  passed through to the SiYuan console by the plugin (`console.debug` only once the plugin's "Debug mode"
-  setting is on). With none of the three, **no dialog opens** (a silent run); when it opens is decided in
-  section 4. Two other channels exist — a toast (`showMessage`, 2.2) and a window you build yourself (3.7) — and
-  which one a button should use is a decision per button: the output dialog is for seeing everything, a toast for
-  a button that stays on the note, a window when the click has to ask something first.
+  any thrown error appear in one result window, whose text can be copied as plain text. With none of the three,
+  **no window opens** (a silent run); `@bis-output` (1.1) decides when it opens. Two other channels exist — a
+  toast (`showMessage`, 2.2) and a window you build yourself (3.7) — and which one a button should use is a
+  decision per button: the result window is for seeing everything, a toast for a button that stays on the note,
+  a window when the click has to ask something first.
 - **Fresh on every click**: the script keeps no state; use `plugin.saveData()` or write into a note when you need
   to remember something.
 - **Calling the kernel**: `const response = await fetchPost("/api/…", {…})`; `code === 0` means success.
 
-### 1.1 Declaring the output dialog and the runtime environment
+### 1.1 Declaring when the result window opens and where the script runs
 
 At the very top of a script (before the first line of code) `//` comments can declare three things; declarations
 after the first code line are ignored:
 
 | Declaration | Effect | Values |
 | --- | --- | --- |
-| `// @bis-output <mode>` | Overrides the plugin's "JavaScript output dialog" setting | `always` / `output` / `console` / `warn` / `error` / `never` |
+| `// @bis-output <mode>` | When the result window opens | `always` / `output` / `console` / `warn` / `error` / `never` |
 | `// @bis-frontends <list>` | Frontends the script may run on | `all`, `desktop`, `desktop-window`, `mobile`, `browser-desktop`, `browser-mobile` |
 | `// @bis-backends <list>` | Backends the script may run on | `all`, `windows`, `linux`, `darwin`, `docker`, `android`, `ios`, `harmony` |
 
-Separate multiple values with commas or spaces. Without a declaration the output mode follows the plugin
-setting and both the frontend and the backend are treated as `all`; an explicit `all` also means unrestricted.
-When the current environment is not in the declared list, the button only shows a toast: no code runs and no
-result dialog opens. The values are the same as SiYuan's marketplace `frontends` / `backends` fields.
+Separate multiple values with commas or spaces. Without a declaration the default output mode applies and both
+the frontend and the backend are treated as `all`; an explicit `all` also means unrestricted. When the current
+environment is not in the declared list, no code runs and no result window opens: the user is told with a toast.
+The values are the same as SiYuan's marketplace `frontends` / `backends` fields.
 
 ```javascript
 // @bis-output error
@@ -182,13 +181,13 @@ Neither can be undone, so ask with `confirm` first — see 3.6.
 
 ## 3. Examples
 
-Paste any of these into "edit the button block → button action → JavaScript".
+Paste any of these into the button's inline `script` action, or into the file that a `file` action points at.
 
 ### 3.1 Smallest example: return value + console
 
 ```javascript
 console.log("the button was clicked");
-return 1 + 1;   // the dialog shows: return value: 2
+return 1 + 1;   // the result window shows: return value: 2
 ```
 
 ### 3.2 Calling the kernel and handling errors
@@ -242,9 +241,9 @@ return next;
 
 ### 3.5 Reading a SiYuan secret or variable
 
-The entries of <kbd>Settings</kbd> > <kbd>Secrets and Variables</kbd> are readable from a script; a name that is
-not configured, or a non-administrator role, gives an empty string. SiYuan stores secrets encrypted, but the
-frontend receives them as plain text, and the per-secret allow-list only limits the kernel's own HTTP requests.
+Secrets and variables are readable from a script; a name that is not configured, or a non-administrator role,
+gives an empty string. SiYuan stores secrets encrypted, but the frontend receives them as plain text, and the
+per-secret allow-list only limits the kernel's own HTTP requests.
 
 ```javascript
 const token = plugin.getSecret("api_token");
@@ -266,7 +265,7 @@ return "waiting for confirmation";
 
 ### 3.7 Building a window
 
-A toast cannot carry a question and the output dialog is not an input: when a click needs more than a message,
+A toast cannot carry a question and the result window is not an input: when a click needs more than a message,
 build the window yourself out of SiYuan's own classes. `new Dialog({…})` returns an object whose `element` is
 the dialog's DOM; close it with `dialog.destroy()`, and give your nodes `data-bis` attributes so the lookups
 never collide with SiYuan's own `data-type` dispatch.
@@ -316,8 +315,8 @@ field("confirm").addEventListener("click", async () => {
 ```
 
 The click handler returns before the user has answered: the script's own "result" is the window, not a value.
-This is the one case where a button legitimately leaves something on screen every time it is clicked — the
-plugin's "JavaScript output dialog" setting does not touch it.
+This is the one case where a button legitimately leaves something on screen every time it is clicked; the
+result-window rule does not apply to it.
 
 ## 4. Caveats
 
@@ -325,8 +324,8 @@ plugin's "JavaScript output dialog" setting does not touch it.
   timestamp or a check.
 - **`exitSiYuan` / `lockScreen` cannot be undone**: `confirm` first; `lockScreen` does nothing in read-only mode
   or on a publish service.
-- **Result dialog**: the plugin setting "JavaScript output dialog" defaults to `With output`, and can be changed
-  to always / console only / warning / error / never; it only decides whether the dialog opens.
+- **Result window**: it opens when there is console output, a return value or an error; `@bis-output` (1.1)
+  overrides that per script.
 - **Two ways to call `fetchPost`**: `await fetchPost(url, data)` resolves with the response; `fetchPost(url, data, cb)`
   uses the callback, which only fires when `code >= 0`.
 - **Read-only state**: write APIs are rejected in publish mode and read-only documents (`code` is not 0); check
@@ -337,6 +336,5 @@ plugin's "JavaScript output dialog" setting does not touch it.
   dock helpers of 2.4 are unavailable.
 - **Plugin storage**: `plugin.loadData` may resolve with a string instead of an object — see 3.4.
 - **Destructive calls**: `/api/block/deleteBlock`, `/api/filetree/removeDoc` and friends cannot be undone.
-- **Debugging**: the plugin passes `console` output through to the SiYuan console while it still appears in the
-  result dialog; `console.debug` only prints once the plugin's "Debug mode" setting is on. Add a `debugger`
-  statement when you need DevTools itself.
+- **Debugging**: every `console` line also reaches the SiYuan console. Add a `debugger` statement when you need
+  DevTools itself.

@@ -5,12 +5,9 @@ written here (`iconCirclePlay`, for example). An empty string means no icon.
 
 ## How the icon set is resolved
 
-- The button block renders the id with `<svg class="svg"><use xlink:href="#iconXxx"></use></svg>`, so the id must
-  exist as `<symbol id="iconXxx">` in the page. SiYuan draws all of its own icons this way.
-- The available symbols are read from the page at runtime (`collectIconNames()`), so the list below is the
-  **built-in** set plus whatever the active icon pack and other plugins registered; an icon pack adds ids that
-  are not listed here.
-- An id that is not loaded renders as nothing: the button keeps its text and loses only the icon.
+- An id is valid when SiYuan's icon set defines it; the list below is the **built-in** set of SiYuan 3.8.x, and
+  an icon pack may add ids that are not listed here.
+- An unknown id is ignored: the button keeps its text and has no icon.
 
 ## Picking by intent
 

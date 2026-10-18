@@ -16,6 +16,10 @@
   `scripts/check-i18n.mjs` 要求两份同键、非空。
 * **文案风格**：客观、技术化、尽量短。目录、字段名、限制条件直接写出来，不要「点一下」「一直以来」这类
   口语与冗余说明；同类失败提示统一写成「…失败，详见控制台」，不重复解释调试模式（那条规则只在设置项里写一次）。
+* **Agent 文档不写界面**：`docs/skill.md` 与它的两份参考（`javascript.md`、`icons.md`）会被打包成技能交给 Agent，
+  而 Agent 只能通过工具调用（`block` / `sql` / `file` / `http_request`）操作，所以这三份里不写菜单、对话框、设置项、
+  编辑器面板、CSS 类名这类只有人能操作或看到的东西，只写数据结构、工具调用、接口语义与限制。`docs/javascript.zh-CN.md`
+  是给用户看的（编辑器里的「查看 JavaScript 文档」），可以写界面路径，两份文案因此允许有这一处差异。
 * 打开 `assets/…` 前先按宿主的 `isPreviewableAsset` 判断：不能建页签的资源交给内核
   `openPath` 通道；**不要用 `window.open`** —— 会被浏览器类插件接管，而 `wnd.addTab(undefined)`
   会弄坏页签布局。
