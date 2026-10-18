@@ -8,8 +8,9 @@
 ## 1. 脚本是怎么执行的
 
 - **触发时机**：点击按钮时执行。
-- **代码从哪来**：直接写在按钮里，或让按钮操作指向「JavaScript 文件」（`assets/` 下的本地文件，或 http(s) 地址）；
-  后者每次点击都重新读文件，改文件就等于改按钮行为。
+- **代码从哪来**：直接写在按钮里，或让按钮操作指向「JavaScript 文件」（本地 `.js` 文件，或 http(s) 地址）；
+  本地文件放在 `data/assets/`（资源目录）或插件的 `data/storage/petal/button-in-siyuan/scripts/` 下，
+  路径统一写成**从工作空间根开始的完整相对路径**。后者每次点击都重新读文件，改文件就等于改按钮行为。
 - **async 包装**：整段代码被包进 async 函数，可以直接 `await`，也可以用 `return` 结束。
 - **输出**：`return` 的值、`console.log / info / debug / warn / error / table / dir` 的输出和抛出的错误都显示在结果弹窗里，
   弹窗可一键复制纯文本，console 输出同时由插件原样转交思源控制台（`console.debug` 只在插件设置里打开「调试模式」后才有输出）；
@@ -18,6 +19,27 @@
   一次看全，Toast 适合长期留在笔记里的按钮，窗口用于点击后还得先问点什么的情况。
 - **每次都重新执行**：脚本不保存状态，要记住东西用 `plugin.saveData()` 或写进笔记。
 - **调用内核接口**：`const response = await fetchPost("/api/…", {…})`，响应的 `code` 为 `0` 才算成功。
+
+### 1.1 声明输出弹窗与运行环境
+
+脚本最前面（第一行代码之前）可以用 `//` 注释声明三件事，写在代码中间不生效：
+
+| 声明 | 作用 | 取值 |
+| --- | --- | --- |
+| `// @bis-output <策略>` | 覆盖插件设置里的「JavaScript 输出弹窗」 | `always` / `output` / `console` / `warn` / `error` / `never` |
+| `// @bis-frontends <列表>` | 允许运行的前端 | `all`、`desktop`、`desktop-window`、`mobile`、`browser-desktop`、`browser-mobile` |
+| `// @bis-backends <列表>` | 允许运行的后端 | `all`、`windows`、`linux`、`darwin`、`docker`、`android`、`ios`、`harmony` |
+
+多个值用逗号或空格分隔。不声明时输出策略跟随插件设置，前端与后端都按 `all` 处理；声明里写了 `all`
+也表示不限制。当前环境不在声明的列表里时，按钮只弹一条 Toast，不执行任何代码，也不弹结果弹窗。
+取值与思源集市包的 `frontends` / `backends` 一致。
+
+```javascript
+// @bis-output error
+// @bis-frontends desktop, mobile
+// @bis-backends windows, linux, darwin
+return 1 + 1;
+```
 
 ## 2. 注入接口清单
 
@@ -131,14 +153,15 @@ jsdelivr CDN连不上或取不到文件时，改用 GitHub 原文件地址：`ht
 | 名字 | 说明 |
 | --- | --- |
 | `protyle` | 当前按钮块所在的编辑器实例，取不到时为 `undefined` |
-| `blockID` | 当前按钮块自己的块 ID |
+| `blockID` | 当前按钮块自己的块 ID；顶栏快捷操作没有块上下文，这里是空串 |
 | `isMobile` | 是否移动端 |
 | `i18n` | 本插件的文案（例如 `i18n.copied`） |
 
 ### 2.10 插件实例上还能用的
 
-- **存储**：`plugin.saveData` / `loadData` / `removeData`，落在 `/data/storage/petal/button-in-siyuan/`；
-  名字可带子目录，但不能用 `..` 穿越出去。
+- **存储**：`plugin.saveData` / `loadData` / `removeData`，落在
+  `/data/storage/petal/button-in-siyuan/storage/`（issue #25 起；旧版本直接放在插件目录根，读取时会自动
+  迁移过来）；名字可带子目录，但不能用 `..` 穿越出去。
 - **密钥与变量**：`plugin.getSecret(name)` / `plugin.getVariable(name)`，见 3.5。
 - **设置与身份**：`plugin.openSetting()`、`plugin.name` / `displayName` / `i18n` / `app`。
 - **事件**：`plugin.eventBus.on / once / off / emit(...)`。

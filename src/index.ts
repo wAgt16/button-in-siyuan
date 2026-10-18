@@ -3,13 +3,15 @@ import type {IEventBusMap, Protyle} from "siyuan";
 import {downloadAgentSkill, installAgentSkill, removeAgentSkill} from "./agentSkill";
 import {syncAssetReferences, syncRenderedAssetReference} from "./assetReference";
 import {createButtonBlockIconHtml} from "./buttonIcon";
+import {openButtonBlockManager} from "./buttonManager";
 import {BUTTON_BLOCK_TYPE, DEFAULT_BUTTON_ICON, parseButtonConfig, renderButtonBlock, serializeButtonConfig} from "./buttonBlock";
 import type {IContext} from "./context";
 import {openButtonBlockEditor} from "./editDialog";
 import type {II18n} from "./i18nKeys";
 import {createLogger, setDebugEnabled} from "./logger";
 import type {ISettings, TCodeMode, TOutputMode} from "./settings";
-import {CODE_MODES, DEFAULT_SETTINGS, loadSettings, OUTPUT_MODES, saveSettings} from "./settings";
+import {CODE_MODES, DEFAULT_SETTINGS, loadSettings, OUTPUT_MODES, removeSettings, saveSettings} from "./settings";
+import {openTopBarManager, openTopBarMenu, TOPBAR_ICON, TOPBAR_ID} from "./topBar";
 import "./index.scss";
 
 const log = createLogger("plugin");
@@ -95,6 +97,26 @@ export default class ButtonInSiYuan extends Plugin {
             render: (options) => renderButtonBlock(context, options),
         };
         this.eventBus.on("click-blockicon", this.blockIconMenu);
+        // 顶栏快捷操作（issue #30）：点击展开菜单，右键与菜单末尾都只给管理入口。
+        // 桌面端是顶栏图标；移动端宿主把图标条目放进「插件」顶栏菜单（addTopBar 对带 icon 的条目两边都注册）
+        this.addTopBar({
+            id: TOPBAR_ID,
+            icon: TOPBAR_ICON,
+            title: context.i18n.topBarTitle,
+            callback: (event) => {
+                const target = event.currentTarget instanceof HTMLElement ? event.currentTarget : undefined;
+                void openTopBarMenu(this.context, target);
+            },
+            contextMenu: (menu) => {
+                // 快捷操作菜单与右键菜单都只给管理入口：新建在管理面板里用加号完成
+                menu.addItem({
+                    icon: "iconSettings",
+                    label: context.i18n.topBarManage,
+                    click: () => openTopBarManager(this.context),
+                });
+            },
+        });
+        log.debug("registered the top bar entry", {id: TOPBAR_ID, icon: TOPBAR_ICON});
         this.protyleSlash = [{
             // filter 是斜杠菜单的搜索关键字（不显示给用户，所以不放进 i18n）：
             // 中文界面按「按钮块」、英文界面按 button / btn 都能搜到
@@ -114,11 +136,23 @@ export default class ButtonInSiYuan extends Plugin {
 
     onunload() {
         this.eventBus.off("click-blockicon", this.blockIconMenu);
+        this.removeTopBar(TOPBAR_ID);
         log.info("plugin unloaded");
         // 禁用、重载与卸载都会走到这里：宿主的 teardown 一定先跑 onunload，只有卸载时才接着补跑
         // uninstall（siyuan 的 app/src/plugin/lifecycle.ts）。所以技能在这里删一次就覆盖了「禁用」
         // 与「卸载」两种情况，不会留下一个指向已停用插件的技能让 Agent 白调一趟。
         return removeAgentSkill(this.name);
+    }
+
+    /**
+     * 从工作空间移除插件时只清掉插件设置（issue #26）：`scripts/`、`storage/` 与 `topbar/` 都是
+     * 用户内容，一律保留，重装后设置回默认。
+     *
+     * 这个钩子只在卸载时运行，禁用与重载只跑 `onunload`，所以不会误清设置。先禁用再卸载时插件没有
+     * 实例，宿主不会调用任何钩子，设置会留在盘上。
+     */
+    uninstall() {
+        return removeSettings(this);
     }
 
     private async initSettings(frontend: string) {
@@ -180,6 +214,18 @@ export default class ButtonInSiYuan extends Plugin {
         skillDownload.className = "b3-button b3-button--outline";
         skillDownload.textContent = i18n.downloadSkill;
         skillDownload.addEventListener("click", () => void this.downloadSkill(skillDownload));
+        // 按钮块管理是独立窗口（issue #28），设置面板只留一个入口
+        const managerButton = document.createElement("button");
+        managerButton.className = "b3-button b3-button--outline";
+        managerButton.textContent = i18n.openButtonManager;
+        managerButton.addEventListener("click", () => {
+            // 定位要回到文档，跳转前先关掉这个设置面板：面板是思源自己的 Dialog，而当前 siyuan 类型里
+            // Setting 还没有 close()，所以按实例从 window.siyuan.dialogs 找回它再销毁（与用户关窗同一条路径）
+            const settingDialog = window.siyuan.dialogs.find((item) => item.element.contains(managerButton));
+            openButtonBlockManager(this.context, {
+                onLocate: () => settingDialog?.destroy(),
+            });
+        });
         this.setting = new Setting({
             confirmCallback: () => {
                 // 保存按钮不等待回调：这里自己把结果落盘、必要时提示
@@ -231,6 +277,11 @@ export default class ButtonInSiYuan extends Plugin {
                 skillSwitch.checked = this.settings.agentSkill;
                 return skillSwitch;
             },
+        });
+        this.setting.addItem({
+            title: i18n.manageButtonBlocks,
+            description: i18n.manageButtonBlocksTip,
+            createActionElement: () => managerButton,
         });
         this.setting.addItem({
             title: i18n.settingsDownloadSkill,

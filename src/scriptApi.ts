@@ -48,6 +48,7 @@ import {
 import type {App} from "siyuan";
 import type {II18n} from "./i18nKeys";
 import {createLogger} from "./logger";
+import {createScriptPlugin} from "./scriptStorage";
 
 const log = createLogger("scriptApi");
 
@@ -111,9 +112,10 @@ export const createScriptScope = (options: {
         ? getAllEditor().find((item) => item.protyle?.element?.contains(options.blockElement as Node))
         : undefined;
     const scope = {
-        // 宿主对象与内核接口
+        // 宿主对象与内核接口。脚本拿到的 plugin 只把 loadData / saveData / removeData
+        // 改写到插件目录下的 storage/（issue #25），其余能力原样保留
         app: options.app,
-        plugin: options.plugin,
+        plugin: createScriptPlugin(options.plugin),
         siyuan: window.siyuan,
         Lute: window.Lute,
         Constants,

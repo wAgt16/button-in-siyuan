@@ -14,6 +14,12 @@
 * `docs/*.md` 的代码块语言统一写 `javascript`，`js` 之类会被 `scripts/check-docs.mjs` 拦下。
 * 加文案键要同时改 `src/i18n/en.json`、`src/i18n/zh-CN.json` 与 `src/i18nKeys.ts`，
   `scripts/check-i18n.mjs` 要求两份同键、非空。
+* **文案风格**：客观、技术化、尽量短。目录、字段名、限制条件直接写出来，不要「点一下」「一直以来」这类
+  口语与冗余说明；同类失败提示统一写成「…失败，详见控制台」，不重复解释调试模式（那条规则只在设置项里写一次）。
+* **Agent 文档不写界面**：`docs/skill.md` 与它的两份参考（`javascript.md`、`icons.md`）会被打包成技能交给 Agent，
+  而 Agent 只能通过工具调用（`block` / `sql` / `file` / `http_request`）操作，所以这三份里不写菜单、对话框、设置项、
+  编辑器面板、CSS 类名这类只有人能操作或看到的东西，只写数据结构、工具调用、接口语义与限制。`docs/javascript.zh-CN.md`
+  是给用户看的（编辑器里的「查看 JavaScript 文档」），可以写界面路径，两份文案因此允许有这一处差异。
 * 打开 `assets/…` 前先按宿主的 `isPreviewableAsset` 判断：不能建页签的资源交给内核
   `openPath` 通道；**不要用 `window.open`** —— 会被浏览器类插件接管，而 `wnd.addTab(undefined)`
   会弄坏页签布局。
@@ -35,7 +41,9 @@
   `fn__size200` 的固定宽度改成宽度下限（文档里的自定义块用的是编辑器字号）。
 * **按钮颜色**：存了颜色才加 `bis-button-color` 类并设 `--bis-button-color`，不存就与原生
   `.b3-button--outline` 逐像素一致。色板全走主题变量（换明暗主题会跟着变），因此不提供任意取色；编号跳过
-  13（daylight 下等于页面底色）与 6（与默认的原生蓝同色）。
+  13（daylight 下等于页面底色）与 6（与默认的原生蓝同色）。**这条规则要同时命中管理窗口里的预览**
+  （`.bis-manager .b3-button.bis-button-color`）：那个窗口不在 `.protyle-wysiwyg` 里，只按块上下文限定会让
+  预览退回原生蓝，与文档里的按钮对不上。
 * **关窗前的「放弃修改」确认**：不是逐条拦取消 / × / `Esc` / 点遮罩，而是把实例上的 `dialog.destroy` 换成
   自己的函数（宿主这四条路最后都调它）。**`disableClose` 只挡遮罩与 ×，挡不住 `Esc`**；判断「有没有改过」
   与保存必须共用同一个 `currentConfig()` 口径，否则会出现「什么都没改也弹确认」。
@@ -53,15 +61,54 @@
 * **JavaScript 操作**：在页面上下文里整段包成 async 函数执行，执行期间接管 `console` 收集输出；弹窗策略
   改动时要同步 `docs/javascript*.md` 第 4 节。接管的同时把每一行原样放回宿主控制台，所以脚本的输出既在
   弹窗里、也在思源控制台里；`console.debug` 一档受设置里的「调试模式」控制，关着时既不进弹窗也不进控制台。
+  **脚本开头的 `@bis-*` 声明**（`src/scriptMeta.ts`，issue #21）在每次执行前解析：`@bis-output` 覆盖这一次的
+  弹窗策略；`@bis-frontends` / `@bis-backends` 用集市包同名列表的取值，当前环境不在列表里时只弹 Toast、
+  不执行代码也不弹结果弹窗。声明只认第一行代码之前的 `//` 注释，取值非法时输出策略回落设置、环境列表
+  退化成「哪儿都不能跑」（与集市包「列表非空且不匹配」的语义一致）。
 * **JavaScript 文件操作**：每次点击都重新取代码（本地走 `/api/file/getFile`，云端重新下载）再交给同一个
   `runScript`，取不到只提示、不执行。**这几个内核文件接口没有用宿主的 `fetchPost`**：`getFile` 成功时回裸
   字节、出错才是 JSON 信封，而宿主对 `code < 0` 只弹提示、不调回调，403/404 拿不到 —— 那正是判断「文件
-  不存在」要用的；写接口用 `fetchSyncPost` 并关掉 `processMessage`。**按钮里存的 `assets/xxx.js` 不能直接
-  喂给 `/api/file/*`**：`assets/…` 相对的是数据目录，而文件接口的 path 相对工作空间根，所以统一用
-  `toWorkspacePath()` 补 `data/` 前缀；少了它文件会落到工作空间根下另建的 `assets/`，插件自己读写正常，
-  但那个目录不在数据目录里，不进资源索引，也不会同步。**云端脚本必须二次确认**（可放弃 / 直接使用 / 下载到
-  `assets/` 之后与云端再无关系）；只有本地文件才提供编辑、改名、删除；脚本文件读写一律不走
-  `plugin.loadData`。
+  不存在」要用的；写接口用 `fetchSyncPost` 并关掉 `processMessage`。**按钮里的 `file` 字段从 issue #20 起
+  统一存工作空间相对路径**：`data/assets/x.js` 或 `data/storage/petal/button-in-siyuan/scripts/x.js`，
+  与 `/api/file/*` 和 Agent 的 `file` 工具同一个口径；旧按钮里的 `assets/x.js` 由 `normalizeScriptPath()`
+  补成 `data/assets/x.js` 继续读取，编辑保存时升级。路径只允许落在这两个脚本目录（`src/pluginPaths.ts`），
+  不在别处读写 `.js`。**云端脚本必须二次确认**（可放弃 / 直接使用 / 下载到 `data/assets/` 之后与云端再无
+  关系）；只有本地文件才提供编辑代码、编辑文件信息（改名 / 移动）与删除；脚本文件读写一律不走
+  `plugin.loadData`。用户资源目录里的脚本仍要写 `custom-data-assets-button-in-siyuan` 属性，但内核的
+  `IsAssetLinkDest` 只认 `assets/` 前缀，所以属性值由 `assetPathOf()` 从完整路径转回 `assets/…`；
+  插件 `scripts/` 下的脚本不是资源，属性会被清掉。
+* **顶栏快捷操作**（issue #30）：在 `onload` 里 `addTopBar` 注册一个 `iconZap` 条目，`onunload`
+  用 `removeTopBar` 配对移除；带 icon 的条目在桌面端是顶栏图标，移动端由宿主放进顶栏的「插件」菜单。点击时现读
+  `data/storage/petal/button-in-siyuan/topbar/`（`src/topBar.ts`）：一个快捷操作一个 JSON 文件，按文件名排序，
+  内容与块 payload 同形但丢掉 `color`（只允许文本、图标与操作，配色不可改）；文件内容非法或没有认识字段的跳过并记日志。
+  菜单每次展开都重新列目录，Agent 新建 / 编辑文件后无需重载。**菜单只执行、末尾只给一个「管理」入口**，
+  新建与编辑都在管理面板里；面板的加号是思源原生图标按钮（`b3-button--outline b3-button--icon`），
+  列表与预览只用图标 + 文本，不套按钮外观（`bis-manager__row-icon` / `bis-manager__action`）。
+  编辑器复用那个编辑窗口，把保存 / 删除 / 运行换成文件操作，并隐藏配色；新建时 `deletable: false`，
+  编辑时删除会删掉对应文件。执行走同一个 `runAction`，但没有块上下文（`blockID` 为空串、`protyle` 为 undefined）。
+* **按钮块管理**（issue #28）：入口是设置面板里的一个按钮，窗口在 `src/buttonManager.ts`。列表用一条 SQL
+  取 `type = 'custom' AND markdown LIKE ';;;button-in-siyuan/button%'` 的块（显式 `LIMIT`，理由同
+  `assetReference.ts`），逐条过 `parseButtonConfig`，不是本插件配置的块跳过；搜索与操作类型筛选都在内存里
+  做。预览复用 `createButtonElement()`，编辑复用同一个编辑窗口。**块可能没在当前窗口渲染**，保存时
+  `updateButtonContentAsync()` 在拿不到宿主 `setContent` 的情况下回落到 `/api/block/updateBlock`（markdown
+  围栏整体替换，块 ID 不变）；编辑窗口关闭后管理器重新查询一次列表。
+* **在文档中定位**：跳转走 `siyuan://blocks/<id>`（宿主的 `processSiYuanUri` 负责打开所在文档、滚动到块并
+  高亮），但**跳转前要先关掉管理窗口与设置面板**：管理窗口自己 `destroy()`，设置面板由入口通过
+  `IButtonBlockManagerOptions.onLocate` 关 —— 插件拿到的 `siyuan` 类型里 `Setting` 还没有 `close()`，入口按
+  实例从 `window.siyuan.dialogs` 里找回那个面板再 `destroy()`（与用户关窗同一条路径），否则文档上会压着两层窗口。
+* **编辑窗口的运行与删除**（issue #27）：左下角两个纯图标按钮，运行用 `runAction()` 走与点击按钮块同一条
+  路径（表单当前值，不要求先保存；链接、内联脚本、脚本文件都一样），删除走 `/api/block/deleteBlock` 并
+  先二次确认。删除成功后把 `saved` 置真再关窗，避免「放弃修改」再拦一次；笔记锁定时只禁用删除，运行照旧，
+  因为直接点击锁定笔记里的按钮块本来就会执行。**按钮尺寸不要自己写死**：宿主的 `.b3-dialog__action` 是
+  `align-items: center`，只有图标的按钮会缩到「16px 图标 + 8px 内边距」＝ 24px 高，图标因此显得偏大、按钮
+  也不方正；同一窗口的 JS 文件路径行是 28×28，因为那圈 `.fn__flex`（`display: flex`，默认 stretch）把它
+  拉到了与输入框同高。`.bis-action-start` 因此用 `align-self: stretch` 撑满整行，外观仍然全部来自
+  `.b3-button--icon`。
+* **脚本数据文件**（issue #25）：注入给脚本的 `plugin` 是插件实例的代理（`src/scriptStorage.ts`），只把
+  `saveData` / `loadData` / `removeData` 的名字改写到插件目录下的 `storage/` 子目录，其余属性与方法原样
+  转发，方法都绑回真实实例（宿主的生命周期检查按实例身份判断）。旧版本写在插件目录根的数据文件在第一次
+  读取时迁到 `storage/` 并删掉旧文件；写入时也会清掉旧位置的同名文件。插件自己的设置仍走原路径，不经过
+  这层代理。
 * **链接操作**（`src/openLink.ts`）：效果要与文档里点 `[]()` 链接一致，即对齐宿主的
   `app/src/editor/openLink.ts`。非本地地址一律交给 `platformUtils.openByMobile`（宿主用的同一个函数，
   `siyuan://` 与插件事件也在里面处理）；本地路径按 `window.siyuan.config.editor.assetOpen` 算动作，移动端
@@ -77,9 +124,10 @@
   的块与同步过来的文档都不经过编辑窗口，只有渲染器当场看得见）、插件加载时整库补一次
   （`syncAssetReferences()` 与 `ial` 比对，只在不一致时写回）。`syncAssetReferences()` 里那条 SQL 必须带
   显式 `LIMIT`：内核给 `/api/query/sql` 套了用户设置的搜索条数上限（默认 64），不写会被静默截断。**导出时
-  只在收集原始树资源的格式里生效**：HTML 与 Word 会把脚本按相对路径复制到导出目录的 `assets/` 下；
-  Markdown `.zip` 与 Pandoc 是导出后重新解析正文再收集，块属性已经丢掉，所以 `.zip` 里没有脚本文件
-  （README 的「限制」写明了）；`.sy.zip` 按思源自身的设计不带资源。
+  只在收集原始树资源的格式里生效**：HTML 与 Word 会把资源目录里的脚本按相对路径复制到导出目录的 `assets/`
+  下；插件 `scripts/` 下的脚本不是资源，任何导出都不会带走它。Markdown `.zip` 与 Pandoc 是导出后重新解析
+  正文再收集，块属性已经丢掉，所以 `.zip` 里也没有 `data/assets/` 的脚本（README 的「限制」写明了）；
+  `.sy.zip` 按思源自身的设计不带资源。
 * **Agent 技能**：技能是**一个目录**，由 `src/agentSkill.ts` 写成
   `data/storage/ai/agent/skills/button-block/`：正文来自 `docs/skill.md`，两份参考文档来自
   `docs/javascript.md` 与 `docs/icons.md`。正文走内核的 `/api/ai/agent/saveSkill`（它只肯写 `SKILL.md`，
@@ -108,7 +156,10 @@
   **设置读出来之前的调用会被丢掉**，所以「插件已加载」这类启动信息放在 `initSettings()` 里打。
 * **生命周期**：`onload` 注册块图标菜单、斜杠菜单项与设置面板，`onunload` 配对注销并删掉写给 Agent 的
   技能（禁用、重载、卸载都会跑到）。异步的设置与技能放到 `initSettings()` 里后跑，免得拖慢文档渲染；写盘
-  只有插件设置（`data/storage/petal/button-in-siyuan/settings`）与技能目录两处。
+  只有插件设置（`data/storage/petal/button-in-siyuan/settings`）与技能目录两处。`uninstall` 只在从工作
+  空间移除插件时运行，只删 `settings`（issue #26）：`scripts/`、`storage/` 与 `topbar/` 都是用户内容，
+  保留。清理走 `plugin.removeData`：它带发起窗口的 app id，裸调 `/api/file/removeFile` 会让本窗口收到
+  storage 变更、在卸载过程中重载插件。先禁用再卸载时没有实例，宿主不调用任何钩子，设置会留下。
 * **设置**：字段都要过 `mergeSettings`（缺字段 / 非法值回落默认），`saveSettings` 写完读回校验（宿主的
   `saveData` 在落盘前就可能 resolve，也不看 `response.code`），失败提示用户重试。面板**不传
   `openInWindow`**；三个下拉列表都不传 `direction`：思源对 `<select>` 自己判成 column（标题在左、控件在

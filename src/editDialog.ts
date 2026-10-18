@@ -1,24 +1,21 @@
-import {confirm, Dialog, openInputDialog, showMessage} from "siyuan";
+import {confirm, Dialog, fetchSyncPost, showMessage} from "siyuan";
 import {setAssetReference} from "./assetReference";
+import {useBottomSheet} from "./bottomSheet";
 import type {IButtonConfig, TButtonAction} from "./buttonBlock";
-import {BUTTON_COLOR_INDEXES, serializeButtonConfig, updateButtonContent} from "./buttonBlock";
+import {BUTTON_COLOR_INDEXES, runAction, serializeButtonConfig, updateButtonContentAsync} from "./buttonBlock";
 import {createCodeEditor} from "./codeEditor";
 import type {IContext} from "./context";
 import {guardUnsavedChanges} from "./discardChanges";
 import {createIconElement, openIconPicker} from "./icon";
 import {createLogger} from "./logger";
 import {
-    ASSET_PREFIX,
     downloadScriptToAssets,
-    isLocalScript,
     isRemoteScript,
+    normalizeScriptPath,
     removeWorkspaceFile,
-    renameWorkspaceFile,
-    toAssetScriptPath,
-    workspaceFileExists,
-    writeWorkspaceFile,
 } from "./scriptFile";
 import {openScriptFileEditor} from "./scriptFileDialog";
+import {openScriptFileInfo} from "./scriptFileInfo";
 import {openScriptDocs} from "./scriptDocs";
 
 const log = createLogger("editDialog");
@@ -88,65 +85,69 @@ const askAboutRemoteScript = (context: IContext, url: string) => new Promise<str
     });
 });
 
-/**
- * 在新建脚本文件的输入框后面补一个固定的 `.js`：用户只填文件名，后缀由 `toAssetScriptPath` 补全。
- *
- * 宿主的 `openInputDialog` 没有后缀槽位（`extraContent` 只能放在输入框下方），所以这里把它的输入框
- * 挪进一个 `fn__flex` 行里、后面挂上后缀；宿主的实现会在返回前聚焦并全选输入框，插件不要这个效果，
- * 所以最后把它 blur 掉（挪动本来也会失焦，这里只是不把焦点找回来）。
- */
-const appendScriptFileSuffix = (dialog: Dialog) => {
-    const input = dialog.element.querySelector<HTMLInputElement>("[data-dialog-input]");
-    if (!input) {
-        log.warn("the input dialog has no input element, leaving the .js suffix out");
-        return;
-    }
-    const row = document.createElement("div");
-    row.className = "fn__flex";
-    const space = document.createElement("div");
-    space.className = "fn__space";
-    const suffix = document.createElement("span");
-    suffix.className = "ft__on-surface fn__flex-center";
-    suffix.textContent = ".js";
-    input.before(row);
-    // fn__block 的 100% 宽度在 flex 行里会把后缀挤出容器，换成 fn__flex-1
-    input.classList.replace("fn__block", "fn__flex-1");
-    row.append(input, space, suffix);
-    input.blur();
-};
-
-/** 打开「编辑按钮块」对话框，确定后由宿主的自定义块渲染器写回并重新渲染。 */
-export const openButtonBlockEditor = (context: IContext, options: {
-    blockID: string,
-    config: IButtonConfig,
+/** 编辑窗口的选项。顶栏快捷操作与按钮块共用这个窗口，只是保存、删除、运行三个出口不同。 */
+export interface IButtonEditorOptions {
+    /** 按钮块 ID；顶栏快捷操作没有块，传空串。 */
+    blockID: string;
+    config: IButtonConfig;
     /**
      * 是否允许编辑。笔记锁定时传 false：窗口退化成预览 —— 所有编辑控件禁用、没有「确定」按钮，
      * 也完全不写回块内容（见 issue #19）。
      */
-    editable?: boolean,
-}) => {
+    editable?: boolean;
+    /** 覆盖窗口标题（顶栏快捷操作用自己的标题）。 */
+    title?: string;
+    /** 是否显示配色选择，默认显示；顶栏快捷操作只允许文本、图标与操作，配色不可改（issue #30）。 */
+    colorEditable?: boolean;
+    /** 是否显示删除按钮，默认显示；新建顶栏快捷操作时还没有东西可删。 */
+    deletable?: boolean;
+    /** 保存出口；返回 false 时留在窗口里。不给就是按钮块，写回块内容。 */
+    onSave?: (config: IButtonConfig) => Promise<boolean>;
+    /** 删除出口（调用前已经二次确认）；返回 false 时留在窗口里。不给就是删除按钮块。 */
+    onDelete?: () => Promise<boolean>;
+    /** 运行出口；不给就走按钮块同一条 runAction。 */
+    onRun?: (config: IButtonConfig) => void;
+    /** 窗口关闭后执行（管理器用它刷新列表，块被删除或内容被改都会走到这里）。 */
+    onClosed?: () => void;
+}
+
+/** 打开「编辑按钮块」对话框，确定后由宿主的自定义块渲染器写回并重新渲染。 */
+export const openButtonBlockEditor = (context: IContext, options: IButtonEditorOptions) => {
     const {i18n} = context;
     const blockID = options.blockID;
     const config = options.config;
     const editable = options.editable !== false;
+    const colorEditable = options.colorEditable !== false;
+    // 运行脚本时把块元素交给作用域，脚本里的 protyle 才能拿到当前编辑器；块不在当前窗口时为空
+    const blockElement = blockID
+        ? document.querySelector<HTMLElement>(`[data-type="NodeCustomBlock"][data-node-id="${blockID}"]`) || undefined
+        : undefined;
     let icon = config.icon;
     /** 0 表示不覆写颜色（思源原生蓝），见 BUTTON_COLOR_INDEXES。 */
-    let color = config.color || 0;
-    log.info("opened the button block editor", {
-        blockID,
+    let color = colorEditable ? config.color || 0 : 0;
+    log.info("opened the button editor", {
+        blockID: blockID || "topbar",
         text: config.text,
         icon: icon || "none",
         color: color || "default",
         action: config.action?.type || "none",
         isMobile: context.isMobile,
         editable,
+        colorEditable,
     });
+    // 移动端把这个对话框换成思源原生的底部抽屉（issue #23）；桌面端保持居中窗口。
+    // 清理函数在对话框销毁时执行，移除手势监听并复原行内样式
+    let disposeSheet: (() => void) | undefined;
     const dialog = new Dialog({
-        title: i18n.editButtonBlock,
+        title: options.title || i18n.editButtonBlock,
         // 比原来的 640px 宽一圈；宽度用 min() 收在视口内（思源自己也给容器留了 88vw 的上限）
         width: "min(760px, 92vw)",
+        destroyCallback: () => {
+            disposeSheet?.();
+            options.onClosed?.();
+        },
         content: `<div class="b3-dialog__content" data-bis="editor-body">
-    <div class="ft__on-surface ft__breakword fn__none" data-bis="readonly-tip">${i18n.readonlyPreviewTip}</div>
+    <div class="ft__on-surface ft__breakword fn__none" data-bis="readonly-tip"><strong>${i18n.readonlyPreviewTip}</strong></div>
     <div class="ft__on-surface">${i18n.buttonText}</div>
     <div class="fn__hr--small"></div>
     <input class="b3-text-field fn__block" data-bis="text" spellcheck="false" placeholder="${i18n.defaultButtonText}">
@@ -158,10 +159,12 @@ export const openButtonBlockEditor = (context: IContext, options: {
         <div class="fn__space"></div>
         <button class="b3-button b3-button--outline" data-bis="clear-icon">${i18n.clearIcon}</button>
     </div>
-    <div class="fn__hr"></div>
-    <div class="ft__on-surface">${i18n.buttonColor}</div>
-    <div class="fn__hr--small"></div>
-    <div class="bis-button-colors" data-bis="colors"></div>
+    <div data-bis="color-field" class="${colorEditable ? "" : "fn__none"}">
+        <div class="fn__hr"></div>
+        <div class="ft__on-surface">${i18n.buttonColor}</div>
+        <div class="fn__hr--small"></div>
+        <div class="bis-button-colors" data-bis="colors"></div>
+    </div>
     <div class="fn__hr"></div>
     <div class="ft__on-surface">${i18n.buttonAction}</div>
     <div class="fn__hr--small"></div>
@@ -200,7 +203,7 @@ export const openButtonBlockEditor = (context: IContext, options: {
             <div class="fn__space"></div>
             <button type="button" class="b3-button b3-button--outline b3-button--icon b3-tooltips b3-tooltips__n" data-bis="file-edit" aria-label="${i18n.scriptFileEdit}"><svg class="svg"><use xlink:href="#iconCode"></use></svg></button>
             <div class="fn__space"></div>
-            <button type="button" class="b3-button b3-button--outline b3-button--icon b3-tooltips b3-tooltips__n" data-bis="file-rename" aria-label="${i18n.scriptFileRename}"><svg class="svg"><use xlink:href="#iconEdit"></use></svg></button>
+            <button type="button" class="b3-button b3-button--outline b3-button--icon b3-tooltips b3-tooltips__n" data-bis="file-info" aria-label="${i18n.scriptFileInfo}"><svg class="svg"><use xlink:href="#iconEdit"></use></svg></button>
             <div class="fn__space"></div>
             <button type="button" class="b3-button b3-button--outline b3-button--icon b3-tooltips b3-tooltips__n" data-bis="file-remove" aria-label="${i18n.scriptFileRemove}"><svg class="svg"><use xlink:href="#iconTrashcan"></use></svg></button>
         </div>
@@ -209,11 +212,19 @@ export const openButtonBlockEditor = (context: IContext, options: {
     </div>
 </div>
 <div class="b3-dialog__action">
+    <div class="fn__flex bis-action-start">
+        <button type="button" class="b3-button b3-button--remove b3-button--icon b3-tooltips b3-tooltips__n${options.deletable === false ? " fn__none" : ""}" data-bis="delete" aria-label="${options.onDelete ? i18n.deleteTopBarButton : i18n.deleteButtonBlock}"><svg><use xlink:href="#iconTrashcan"></use></svg></button>
+        <div class="fn__space"></div>
+        <button type="button" class="b3-button b3-button--outline b3-button--icon b3-tooltips b3-tooltips__n" data-bis="run" aria-label="${i18n.runButtonBlock}"><svg><use xlink:href="#iconCirclePlay"></use></svg></button>
+    </div>
     <button class="b3-button b3-button--cancel" data-bis="cancel">${i18n.cancel}</button>
     <div class="fn__space"></div>
     <button class="b3-button b3-button--text fn__none" data-bis="save">${i18n.save}</button>
 </div>`,
     });
+    if (context.isMobile) {
+        disposeSheet = useBottomSheet(dialog);
+    }
     const field = <T extends HTMLElement>(type: string) => {
         const element = dialog.element.querySelector<T>(`[data-bis="${type}"]`);
         if (!element) {
@@ -298,12 +309,14 @@ export const openButtonBlockEditor = (context: IContext, options: {
         } else if (actionElement.value === "script") {
             action = {type: "script", script: scriptEditor.getValue()};
         } else if (actionElement.value === "file") {
-            action = {type: "file", file: fileElement.value.trim()};
+            const raw = fileElement.value.trim();
+            // 本地脚本一律存成从工作空间根开始的完整路径；旧格式由 normalizeScriptPath 升级
+            action = {type: "file", file: isRemoteScript(raw) ? raw : normalizeScriptPath(raw) || raw};
         }
         return {
             text: textElement.value.trim() || i18n.defaultButtonText,
             icon,
-            color: color || undefined,
+            color: colorEditable ? color || undefined : undefined,
             action,
         };
     };
@@ -311,7 +324,10 @@ export const openButtonBlockEditor = (context: IContext, options: {
     textElement.value = config.text;
     actionElement.value = config.action?.type || "";
     linkElement.value = config.action?.type === "link" ? config.action.link : "";
-    fileElement.value = config.action?.type === "file" ? config.action.file : "";
+    // 旧按钮里存的是 `assets/x.js`（相对数据目录），打开时直接显示升级后的完整路径；
+    // 云端地址没有本地目录概念，原样保留
+    const initialFile = config.action?.type === "file" ? config.action.file : "";
+    fileElement.value = isRemoteScript(initialFile) ? initialFile : normalizeScriptPath(initialFile) || initialFile;
     updateIconElement();
     updateColorElement();
     updateActionFields();
@@ -324,10 +340,12 @@ export const openButtonBlockEditor = (context: IContext, options: {
         fileElement.readOnly = true;
         iconElement.disabled = true;
         // 脚本文件的四个按钮里只有「编辑」留到预览模式（下面单独放行）：它打开的是只读窗口，不写盘
-        ["file-create", "file-rename", "file-remove"].forEach((type) => {
+        ["file-create", "file-info", "file-remove"].forEach((type) => {
             field<HTMLButtonElement>(type).disabled = true;
         });
         dialog.element.querySelector('[data-bis="readonly-tip"]')?.classList.remove("fn__none");
+        // 锁定的笔记里不能删块；运行仍可用，与直接点击按钮块的行为一致
+        field<HTMLButtonElement>("delete").disabled = true;
     } else {
         field<HTMLButtonElement>("save").classList.remove("fn__none");
     }
@@ -354,32 +372,15 @@ export const openButtonBlockEditor = (context: IContext, options: {
         log.debug("cleared the button icon");
     });
     /**
-     * 取输入框里的本地脚本路径。云端地址与空值都只提示不动作：编辑、重命名、删除只对
-     * assets/ 下的 .js 文件开放（云端文件插件没有权限也不该改）。
+     * 取输入框里的本地脚本路径（规范成工作空间相对路径）。云端地址与空值都只提示不动作：
+     * 编辑代码、编辑文件信息、删除只对两个脚本目录下的 .js 文件开放（云端文件插件没有权限也不该改）。
      */
     const localScriptPath = () => {
-        const path = fileElement.value.trim();
-        if (!isLocalScript(path)) {
-            log.warn("the script file action needs a local assets/ script", {path});
+        const path = normalizeScriptPath(fileElement.value);
+        if (!path) {
+            log.warn("the script file action needs a local script", {value: fileElement.value});
             showMessage(i18n.scriptFileNeeded);
             fileElement.focus();
-            return;
-        }
-        return path;
-    };
-    /**
-     * 新建/重命名输入框里的名字 → assets/ 下的脚本路径。新建窗口的输入框后面固定显示 `.js`，
-     * 用户只填文件名；空名字与非法名字分别提示，都留在窗口里继续改。
-     */
-    const newScriptPath = (value: string) => {
-        if (!value.trim()) {
-            log.warn("the script file name is empty");
-            showMessage(i18n.scriptFileNameRequired);
-            return;
-        }
-        const path = toAssetScriptPath(value);
-        if (!path) {
-            showMessage(i18n.scriptFileInvalidName);
             return;
         }
         return path;
@@ -389,32 +390,12 @@ export const openButtonBlockEditor = (context: IContext, options: {
         showMessage(error instanceof Error && error.message ? error.message : i18n.scriptFileFailed);
     };
     field<HTMLButtonElement>("file-create").addEventListener("click", () => {
-        const dialog = openInputDialog({
-            title: i18n.scriptFileCreateTitle,
-            label: i18n.scriptFileName,
-            // 不预填：让用户自己起名，扩展名由输入框后面的固定后缀给出
-            value: "",
-            onConfirm: async (value, inputDialog) => {
-                const path = newScriptPath(value);
-                if (!path) {
-                    return;
-                }
-                try {
-                    if (await workspaceFileExists(path)) {
-                        showMessage(i18n.scriptFileExists);
-                        return;
-                    }
-                    await writeWorkspaceFile(path, "");
-                } catch (error) {
-                    reportScriptFailure(error, {path, action: "create"});
-                    return;
-                }
+        openScriptFileInfo(context, {
+            mode: "create",
+            onSaved: (path) => {
                 fileElement.value = path;
-                log.info("created a script file", {path});
-                inputDialog.destroy();
             },
         });
-        appendScriptFileSuffix(dialog);
     });
     field<HTMLButtonElement>("file-edit").addEventListener("click", () => {
         // 这一条在预览模式下也留着：脚本文件窗口是只读的，看一眼文件内容不会改动任何东西
@@ -423,41 +404,19 @@ export const openButtonBlockEditor = (context: IContext, options: {
             void openScriptFileEditor(context, {path, editable});
         }
     });
-    field<HTMLButtonElement>("file-rename").addEventListener("click", () => {
+    field<HTMLButtonElement>("file-info").addEventListener("click", () => {
+        // 改名与移动共用一个窗口：位置可以换到 assets/ 或插件的 scripts/，名字一起改也行
         const path = localScriptPath();
         if (!path) {
             return;
         }
-        const dialog = openInputDialog({
-            title: i18n.scriptFileRenameTitle,
-            label: i18n.scriptFileName,
-            // 与新建窗口一致：只填名字，扩展名由输入框后面的固定后缀给出
-            value: path.substring(ASSET_PREFIX.length).replace(/\.js$/i, ""),
-            onConfirm: async (value, inputDialog) => {
-                const next = newScriptPath(value);
-                if (!next) {
-                    return;
-                }
-                if (next === path) {
-                    inputDialog.destroy();
-                    return;
-                }
-                try {
-                    if (await workspaceFileExists(next)) {
-                        showMessage(i18n.scriptFileExists);
-                        return;
-                    }
-                    await renameWorkspaceFile(path, next);
-                } catch (error) {
-                    reportScriptFailure(error, {path, next, action: "rename"});
-                    return;
-                }
+        openScriptFileInfo(context, {
+            mode: "edit",
+            path,
+            onSaved: (next) => {
                 fileElement.value = next;
-                log.info("renamed a script file", {path, next});
-                inputDialog.destroy();
             },
         });
-        appendScriptFileSuffix(dialog);
     });
     field<HTMLButtonElement>("file-remove").addEventListener("click", () => {
         const path = localScriptPath();
@@ -515,6 +474,17 @@ export const openButtonBlockEditor = (context: IContext, options: {
                 fileElement.focus();
                 return;
             }
+            if (!isRemoteScript(path)) {
+                const normalized = normalizeScriptPath(path);
+                if (!normalized) {
+                    log.warn("save rejected: the script file path is not in a managed directory", {blockID, path});
+                    showMessage(i18n.scriptFileNeeded);
+                    fileElement.focus();
+                    return;
+                }
+                // 旧格式（assets/…）在这里升级成完整路径，按钮里从此只存一种形式
+                fileElement.value = normalized;
+            }
             if (isRemoteScript(path)) {
                 const accepted = await askAboutRemoteScript(context, path);
                 if (!accepted) {
@@ -528,12 +498,15 @@ export const openButtonBlockEditor = (context: IContext, options: {
             }
         }
         const next = currentConfig();
-        if (!updateButtonContent(blockID, next)) {
-            log.error("failed to write the button block back, keeping the dialog open", {blockID});
+        // 顶栏快捷操作由 onSave 写文件；块在别的文档里（管理器打开）时没有渲染器可写，
+        // updateButtonContentAsync 会自动回落到内核的 updateBlock
+        const written = options.onSave ? await options.onSave(next) : await updateButtonContentAsync(blockID, next);
+        if (!written) {
+            log.error("failed to write the button back, keeping the dialog open", {blockID: blockID || "topbar"});
             showMessage(i18n.blockNotEditable);
             return;
         }
-        log.info("saved the button block", {
+        log.info("saved the button", {
             blockID,
             text: next.text,
             icon: icon || "none",
@@ -541,11 +514,61 @@ export const openButtonBlockEditor = (context: IContext, options: {
             action: next.action?.type || "none",
             file: next.action?.type === "file" ? next.action.file : "none",
         });
-        // 让思源知道这个块引用了哪个脚本文件，免得它出现在「未引用的资源文件」里被清理掉
-        void setAssetReference(blockID, next);
+        // 让思源知道这个块引用了哪个脚本文件，免得它出现在「未引用的资源文件」里被清理掉。
+        // 顶栏快捷操作不是块，没有块属性要维护
+        if (!options.onSave) {
+            void setAssetReference(blockID, next);
+        }
         // 已经写回块里了，关窗时不必再问一次
         saved = true;
         dialog.destroy();
+    });
+    // 运行：拿表单当前值走与点击按钮块完全相同的 runAction，不用先保存就能试
+    field<HTMLButtonElement>("run").addEventListener("click", () => {
+        const running = currentConfig();
+        log.info("running the button from the editor", {
+            blockID: blockID || "topbar",
+            action: running.action?.type || "none",
+            editable,
+        });
+        if (options.onRun) {
+            options.onRun(running);
+        } else {
+            runAction(context, {blockID, blockElement, config: running});
+        }
+    });
+    // 删除：二次确认后走内核接口，块从文档里移除
+    field<HTMLButtonElement>("delete").addEventListener("click", () => {
+        if (!editable) {
+            log.warn("delete rejected: the note is locked", {blockID});
+            return;
+        }
+        confirm(options.onDelete ? i18n.deleteTopBarButton : i18n.deleteButtonBlock,
+            options.onDelete ? i18n.deleteTopBarButtonTip : i18n.deleteButtonBlockTip, () => {
+                void (async () => {
+                    try {
+                        if (options.onDelete) {
+                            if (!await options.onDelete()) {
+                                log.error("failed to delete the top bar button");
+                                showMessage(i18n.deleteTopBarButtonFailed);
+                                return;
+                            }
+                        } else {
+                            const response = await fetchSyncPost("/api/block/deleteBlock", {id: blockID}, undefined, false);
+                            if (response.code !== 0) {
+                                throw new Error(response.msg || `/api/block/deleteBlock code ${response.code}`);
+                            }
+                        }
+                        log.info("deleted the button", {blockID: blockID || "topbar"});
+                        // 已经删了，关窗时不用再问「放弃修改」
+                        saved = true;
+                        dialog.destroy();
+                    } catch (error) {
+                        log.error("failed to delete the button", {blockID: blockID || "topbar", error});
+                        showMessage(options.onDelete ? i18n.deleteTopBarButtonFailed : i18n.deleteButtonBlockFailed);
+                    }
+                })();
+            });
     });
     // 打开窗口时不聚焦任何输入框（原来是聚焦并全选按钮文字，顺手敲键盘就把它改掉了），要改哪一项用户自己点：
     // 焦点留在宿主的对话框容器上，Tab 与 Esc 照常
