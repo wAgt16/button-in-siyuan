@@ -85,7 +85,8 @@
   新建与编辑都在管理面板里；面板的加号是思源原生图标按钮（`b3-button--outline b3-button--icon`），
   列表与预览只用图标 + 文本，不套按钮外观（`bis-manager__row-icon` / `bis-manager__action`）。
   编辑器复用那个编辑窗口，把保存 / 删除 / 运行换成文件操作，并隐藏配色；新建时 `deletable: false`，
-  编辑时删除会删掉对应文件。执行走同一个 `runAction`，但没有块上下文（`blockID` 为空串、`protyle` 为 undefined）。
+  初始图标用 `DEFAULT_BUTTON_ICON`（`iconCirclePlay`，与新建按钮块一致），编辑时沿用文件里的图标，
+  删除会删掉对应文件。执行走同一个 `runAction`，但没有块上下文（`blockID` 为空串、`protyle` 为 undefined）。
 * **按钮块管理**（issue #28）：入口是设置面板里的一个按钮，窗口在 `src/buttonManager.ts`。列表用一条 SQL
   取 `type = 'custom' AND markdown LIKE ';;;button-in-siyuan/button%'` 的块（显式 `LIMIT`，理由同
   `assetReference.ts`），逐条过 `parseButtonConfig`，不是本插件配置的块跳过；搜索与操作类型筛选都在内存里

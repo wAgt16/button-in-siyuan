@@ -1,7 +1,11 @@
 import {describe, expect, it, vi} from "vitest";
 import {TOPBAR_DIR, loadTopBarActions, openTopBarManager, openTopBarMenu, removeTopBarAction, writeTopBarAction} from "../src/topBar";
+import {openButtonBlockEditor} from "../src/editDialog";
 import {fetchSyncPost, Menu, platformUtils, showMessage} from "./mocks/siyuan";
 import {makeConfig, makeContext, readFileText, textResponse} from "./helpers";
+
+// 管理器只通过这个入口开编辑窗口，换成替身就能看到它拿到的初始表单值
+vi.mock("../src/editDialog", () => ({openButtonBlockEditor: vi.fn()}));
 
 const topBarPath = (name: string) => `${TOPBAR_DIR}/${name}`;
 
@@ -224,6 +228,28 @@ describe("openTopBarMenu", () => {
 describe("openTopBarManager", () => {
     const waitForRows = () => vi.waitFor(() => {
         expect(document.querySelectorAll(".bis-manager__row").length).toBeGreaterThan(0);
+    });
+
+    it("prefills a new quick action with the default icon", async () => {
+        fetchSyncPost.mockResolvedValue({code: 0, data: []});
+        openTopBarManager(makeContext());
+        document.querySelector<HTMLElement>('[data-bis="create"]')?.click();
+        expect(openButtonBlockEditor).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+            blockID: "",
+            config: {text: "topBarDefaultText", icon: "iconCirclePlay"},
+        }));
+    });
+
+    it("keeps the icon of the quick action being edited", async () => {
+        fetchSyncPost.mockResolvedValue({code: 0, data: [{name: "a.json"}]});
+        mockFiles({[topBarPath("a.json")]: configJson({text: "Quick", icon: ""})});
+        openTopBarManager(makeContext());
+        await waitForRows();
+        document.querySelector<HTMLElement>(".bis-manager__row")?.click();
+        document.querySelector<HTMLElement>(".bis-manager__actions button")?.click();
+        expect(openButtonBlockEditor).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+            config: expect.objectContaining({text: "Quick", icon: ""}),
+        }));
     });
 
     it("shows the empty hint and the count", async () => {

@@ -1,7 +1,7 @@
 import {Dialog, fetchSyncPost, Menu, showMessage} from "siyuan";
 import type {APIFormData, IMenu, PutFileRequestInput} from "siyuan";
 import type {IButtonConfig} from "./buttonBlock";
-import {parseButtonConfig, runAction} from "./buttonBlock";
+import {DEFAULT_BUTTON_ICON, parseButtonConfig, runAction} from "./buttonBlock";
 import {describeButtonAction} from "./buttonManager";
 import type {IContext} from "./context";
 import {openButtonBlockEditor} from "./editDialog";
@@ -293,7 +293,8 @@ export const openTopBarManager = (context: IContext) => {
     const openEditor = (action?: ITopBarAction) => {
         openButtonBlockEditor(context, {
             blockID: "",
-            config: action?.config || {text: i18n.topBarDefaultText, icon: ""},
+            // 新建时给一个默认图标：空图标在菜单里只显示文本，用户往往还要再点一次选图标
+            config: action?.config || {text: i18n.topBarDefaultText, icon: DEFAULT_BUTTON_ICON},
             title: action ? i18n.topBarEditTitle : i18n.topBarNewTitle,
             colorEditable: false,
             deletable: Boolean(action),
