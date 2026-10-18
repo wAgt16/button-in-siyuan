@@ -79,6 +79,8 @@ plugin reload — add, change or delete the file and the menu follows.
 | Provide the button block skill to the agent | On by default: writes a skill explaining button blocks into the workspace skill directory; switching it off deletes that skill. |
 | Download the skill | The "Download skill" button saves the whole skill as one zip file through SiYuan's own save dialog. |
 
+Uninstalling the plugin deletes only its settings file (`data/storage/petal/button-in-siyuan/settings`): scripts under `scripts/`, script data under `storage/` and top bar actions under `topbar/` are kept, and a reinstall starts from the default settings. If the plugin is disabled before uninstalling, there is no instance to run the cleanup, so the settings file stays.
+
 ## Link addresses
 
 A link address behaves like the same link inside a document, because SiYuan's link handling does the work:

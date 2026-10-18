@@ -156,7 +156,10 @@
   **设置读出来之前的调用会被丢掉**，所以「插件已加载」这类启动信息放在 `initSettings()` 里打。
 * **生命周期**：`onload` 注册块图标菜单、斜杠菜单项与设置面板，`onunload` 配对注销并删掉写给 Agent 的
   技能（禁用、重载、卸载都会跑到）。异步的设置与技能放到 `initSettings()` 里后跑，免得拖慢文档渲染；写盘
-  只有插件设置（`data/storage/petal/button-in-siyuan/settings`）与技能目录两处。
+  只有插件设置（`data/storage/petal/button-in-siyuan/settings`）与技能目录两处。`uninstall` 只在从工作
+  空间移除插件时运行，只删 `settings`（issue #26）：`scripts/`、`storage/` 与 `topbar/` 都是用户内容，
+  保留。清理走 `plugin.removeData`：它带发起窗口的 app id，裸调 `/api/file/removeFile` 会让本窗口收到
+  storage 变更、在卸载过程中重载插件。先禁用再卸载时没有实例，宿主不调用任何钩子，设置会留下。
 * **设置**：字段都要过 `mergeSettings`（缺字段 / 非法值回落默认），`saveSettings` 写完读回校验（宿主的
   `saveData` 在落盘前就可能 resolve，也不看 `response.code`），失败提示用户重试。面板**不传
   `openInWindow`**；三个下拉列表都不传 `direction`：思源对 `<select>` 自己判成 column（标题在左、控件在

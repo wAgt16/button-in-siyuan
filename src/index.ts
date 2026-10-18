@@ -10,7 +10,7 @@ import {openButtonBlockEditor} from "./editDialog";
 import type {II18n} from "./i18nKeys";
 import {createLogger, setDebugEnabled} from "./logger";
 import type {ISettings, TCodeMode, TOutputMode} from "./settings";
-import {CODE_MODES, DEFAULT_SETTINGS, loadSettings, OUTPUT_MODES, saveSettings} from "./settings";
+import {CODE_MODES, DEFAULT_SETTINGS, loadSettings, OUTPUT_MODES, removeSettings, saveSettings} from "./settings";
 import {openTopBarManager, openTopBarMenu, TOPBAR_ICON, TOPBAR_ID} from "./topBar";
 import "./index.scss";
 
@@ -142,6 +142,17 @@ export default class ButtonInSiYuan extends Plugin {
         // uninstall（siyuan 的 app/src/plugin/lifecycle.ts）。所以技能在这里删一次就覆盖了「禁用」
         // 与「卸载」两种情况，不会留下一个指向已停用插件的技能让 Agent 白调一趟。
         return removeAgentSkill(this.name);
+    }
+
+    /**
+     * 从工作空间移除插件时只清掉插件设置（issue #26）：`scripts/`、`storage/` 与 `topbar/` 都是
+     * 用户内容，一律保留，重装后设置回默认。
+     *
+     * 这个钩子只在卸载时运行，禁用与重载只跑 `onunload`，所以不会误清设置。先禁用再卸载时插件没有
+     * 实例，宿主不会调用任何钩子，设置会留在盘上。
+     */
+    uninstall() {
+        return removeSettings(this);
     }
 
     private async initSettings(frontend: string) {

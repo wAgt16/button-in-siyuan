@@ -105,3 +105,27 @@ export const saveSettings = async (plugin: Plugin, settings: ISettings) => {
     log.info("saved the plugin settings", {settings: written});
     return true;
 };
+
+/**
+ * 卸载时只删设置文件（issue #26）：`scripts/`、`storage/` 与 `topbar/` 都是用户内容，一律保留。
+ *
+ * 走宿主的 `removeData` 而不是自己调 `/api/file/removeFile`：它会带上发起窗口的 app id，内核据此
+ * 把 storage 变更推给别的窗口、排除自己（`kernel/model/push_reload.go`）；裸调会让本窗口也收到
+ * 变更，而插件没有覆盖 `onDataChanged`，宿主会重载整个插件——那正是它被卸载的时候。
+ * 文件不存在时内核回 404（从没改过设置就是这种情况），按成功处理。
+ */
+export const removeSettings = async (plugin: Plugin) => {
+    try {
+        const response = await plugin.removeData(SETTINGS_STORAGE);
+        if (response.code === 0) {
+            log.info("removed the plugin settings");
+        } else if (response.code === 404) {
+            log.debug("the plugin settings file is not there to remove");
+        } else {
+            log.warn("failed to remove the plugin settings", {code: response.code, msg: response.msg});
+        }
+    } catch (error) {
+        // 只读模式、发布服务或实例已销毁时 removeData 直接 reject；卸载流程里不打扰用户
+        log.warn("cannot remove the plugin settings", {error});
+    }
+};
