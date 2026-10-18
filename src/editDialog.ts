@@ -1,5 +1,6 @@
 import {confirm, Dialog, openInputDialog, showMessage} from "siyuan";
 import {setAssetReference} from "./assetReference";
+import {useBottomSheet} from "./bottomSheet";
 import type {IButtonConfig, TButtonAction} from "./buttonBlock";
 import {BUTTON_COLOR_INDEXES, serializeButtonConfig, updateButtonContent} from "./buttonBlock";
 import {createCodeEditor} from "./codeEditor";
@@ -141,10 +142,14 @@ export const openButtonBlockEditor = (context: IContext, options: {
         isMobile: context.isMobile,
         editable,
     });
+    // 移动端把这个对话框换成思源原生的底部抽屉（issue #23）；桌面端保持居中窗口。
+    // 清理函数在对话框销毁时执行，移除手势监听并复原行内样式
+    let disposeSheet: (() => void) | undefined;
     const dialog = new Dialog({
         title: i18n.editButtonBlock,
         // 比原来的 640px 宽一圈；宽度用 min() 收在视口内（思源自己也给容器留了 88vw 的上限）
         width: "min(760px, 92vw)",
+        destroyCallback: () => disposeSheet?.(),
         content: `<div class="b3-dialog__content" data-bis="editor-body">
     <div class="ft__on-surface ft__breakword fn__none" data-bis="readonly-tip"><strong>${i18n.readonlyPreviewTip}</strong></div>
     <div class="ft__on-surface">${i18n.buttonText}</div>
@@ -214,6 +219,9 @@ export const openButtonBlockEditor = (context: IContext, options: {
     <button class="b3-button b3-button--text fn__none" data-bis="save">${i18n.save}</button>
 </div>`,
     });
+    if (context.isMobile) {
+        disposeSheet = useBottomSheet(dialog);
+    }
     const field = <T extends HTMLElement>(type: string) => {
         const element = dialog.element.querySelector<T>(`[data-bis="${type}"]`);
         if (!element) {
