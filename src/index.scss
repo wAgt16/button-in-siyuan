@@ -27,6 +27,15 @@
     }
 }
 
+// 移动端的 JavaScript 文件编辑窗口占满页面（issue #24）：宿主的容器默认留 88vw 上限与圆角，
+// 这里取消它们，让「页面」而不是「卡片」铺满可视区域；宽度与高度由 scriptFileDialog.ts 的行内样式给出。
+.b3-dialog__container.bis-dialog-fullscreen {
+    max-width: 100%;
+    max-height: 100%;
+    border: 0;
+    border-radius: 0;
+}
+
 // 编辑窗口里的色板：直接复用思源正文颜色面板的 .color__square（自带 26px 方块与 4px 间距）。
 .bis-button-colors {
     display: flex;

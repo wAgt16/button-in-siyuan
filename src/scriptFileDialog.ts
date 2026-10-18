@@ -31,12 +31,12 @@ export const openScriptFileEditor = async (context: IContext, options: {
         return;
     }
     log.info("opened the script file editor", {path: options.path, chars: content.length, editable});
+    // 移动端占满整个可见页面（issue #24）：键盘弹起时也有足够高度写代码，不再是中间的小窗口。
+    // 桌面端保持原来的宽度与默认高度，编辑区填满正文剩下的空间（见 src/codeEditor.ts）
     const dialog = new Dialog({
         title: options.path,
-        // 比原来的 640px 宽一圈、并给一个默认高度：编辑区会填满正文剩下的空间（见 src/codeEditor.ts）。
-        // 两个 min() 一起保证窗口不会顶出屏幕
-        width: "min(880px, 92vw)",
-        height: "min(84vh, 720px)",
+        width: context.isMobile ? "100%" : "min(880px, 92vw)",
+        height: context.isMobile ? "100%" : "min(84vh, 720px)",
         content: `<div class="b3-dialog__content" data-bis="editor-body">
     <div class="ft__on-surface ft__breakword fn__none" data-bis="readonly-tip"><strong>${i18n.readonlyPreviewTip}</strong></div>
     <div data-bis="file-editor"></div>
@@ -49,6 +49,10 @@ export const openScriptFileEditor = async (context: IContext, options: {
     <button class="b3-button b3-button--text fn__none" data-bis="save">${i18n.save}</button>
 </div>`,
     });
+    if (context.isMobile) {
+        // 满屏时去掉圆角与描边，让它看起来就是一个页面而不是浮在页面上的卡片
+        dialog.element.querySelector(".b3-dialog__container")?.classList.add("bis-dialog-fullscreen");
+    }
     const field = <T extends HTMLElement>(type: string) => dialog.element.querySelector<T>(`[data-bis="${type}"]`);
     const editorSettings = context.getSettings();
     const editor = createCodeEditor({
