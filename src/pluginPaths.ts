@@ -14,8 +14,8 @@ export const PLUGIN_STORAGE_DIR = `data/storage/petal/${PLUGIN_NAME}`;
 /** JavaScript 文件在插件目录下的子目录。 */
 export const PLUGIN_SCRIPT_DIR = `${PLUGIN_STORAGE_DIR}/scripts/`;
 
-/** 按钮脚本通过 `plugin.saveData` 写的数据文件都收在这个子目录里（见 scriptStorage.ts）。 */
-export const PLUGIN_DATA_DIR = `${PLUGIN_STORAGE_DIR}/storage/`;
+/** 按钮脚本通过 `plugin.saveData` 写的数据文件在插件目录下的前缀（见 scriptStorage.ts）。 */
+export const SCRIPT_DATA_PREFIX = "storage/";
 
 /** 用户资源目录（工作空间相对路径）；旧版本把脚本放在这里。 */
 export const ASSET_SCRIPT_DIR = "data/assets/";

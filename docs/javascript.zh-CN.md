@@ -138,8 +138,9 @@ jsdelivr CDN连不上或取不到文件时，改用 GitHub 原文件地址：`ht
 
 ### 2.10 插件实例上还能用的
 
-- **存储**：`plugin.saveData` / `loadData` / `removeData`，落在 `/data/storage/petal/button-in-siyuan/`；
-  名字可带子目录，但不能用 `..` 穿越出去。
+- **存储**：`plugin.saveData` / `loadData` / `removeData`，落在
+  `/data/storage/petal/button-in-siyuan/storage/`（issue #25 起；旧版本直接放在插件目录根，读取时会自动
+  迁移过来）；名字可带子目录，但不能用 `..` 穿越出去。
 - **密钥与变量**：`plugin.getSecret(name)` / `plugin.getVariable(name)`，见 3.5。
 - **设置与身份**：`plugin.openSetting()`、`plugin.name` / `displayName` / `i18n` / `app`。
 - **事件**：`plugin.eventBus.on / once / off / emit(...)`。

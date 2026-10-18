@@ -165,7 +165,8 @@ policy, so a failure does not go unnoticed.
   writes idempotent, and remind the user to back up before a script that creates or deletes notes. The script
   scope also contains `exitSiYuan()` and `lockScreen()`, which quit SiYuan or lock the screen: only use them
   when the user asked for exactly that, and wrap the call in `confirm(...)`.
-- When a script has to remember something, keep it in an object (`plugin.saveData("click-count", {count: n})`):
-  a plugin storage file has no extension, and a bare number or string comes back from `plugin.loadData` as
-  text, so `count + 1` would concatenate digits.
+- When a script has to remember something, keep it in an object (`plugin.saveData("click-count", {count: n})`).
+  These files land in `data/storage/petal/button-in-siyuan/storage/`; a plugin storage file has no extension,
+  and a bare number or string comes back from `plugin.loadData` as text, so `count + 1` would concatenate
+  digits. Older files still at the plugin directory root are migrated on the next read.
 - The click itself can only be confirmed by the user inside SiYuan.

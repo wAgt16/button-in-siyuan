@@ -65,6 +65,11 @@
   `plugin.loadData`。用户资源目录里的脚本仍要写 `custom-data-assets-button-in-siyuan` 属性，但内核的
   `IsAssetLinkDest` 只认 `assets/` 前缀，所以属性值由 `assetPathOf()` 从完整路径转回 `assets/…`；
   插件 `scripts/` 下的脚本不是资源，属性会被清掉。
+* **脚本数据文件**（issue #25）：注入给脚本的 `plugin` 是插件实例的代理（`src/scriptStorage.ts`），只把
+  `saveData` / `loadData` / `removeData` 的名字改写到插件目录下的 `storage/` 子目录，其余属性与方法原样
+  转发，方法都绑回真实实例（宿主的生命周期检查按实例身份判断）。旧版本写在插件目录根的数据文件在第一次
+  读取时迁到 `storage/` 并删掉旧文件；写入时也会清掉旧位置的同名文件。插件自己的设置仍走原路径，不经过
+  这层代理。
 * **链接操作**（`src/openLink.ts`）：效果要与文档里点 `[]()` 链接一致，即对齐宿主的
   `app/src/editor/openLink.ts`。非本地地址一律交给 `platformUtils.openByMobile`（宿主用的同一个函数，
   `siyuan://` 与插件事件也在里面处理）；本地路径按 `window.siyuan.config.editor.assetOpen` 算动作，移动端

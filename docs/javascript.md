@@ -146,8 +146,10 @@ Neither can be undone, so ask with `confirm` first — see 3.6.
 
 ### 2.10 What else `plugin.` gives you
 
-- **Storage**: `plugin.saveData` / `loadData` / `removeData`, under `/data/storage/petal/button-in-siyuan/`;
-  names may contain subdirectories but cannot escape with `..`.
+- **Storage**: `plugin.saveData` / `loadData` / `removeData`, under
+  `/data/storage/petal/button-in-siyuan/storage/` (since issue #25; older versions wrote straight into the
+  plugin directory and are migrated on the next read); names may contain subdirectories but cannot escape
+  with `..`.
 - **Secrets and variables**: `plugin.getSecret(name)` / `plugin.getVariable(name)` — see 3.5.
 - **Settings and identity**: `plugin.openSetting()`, `plugin.name` / `displayName` / `i18n` / `app`.
 - **Events**: `plugin.eventBus.on / once / off / emit(...)`.
