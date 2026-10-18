@@ -1,6 +1,8 @@
+import {getBackend, getFrontend, showMessage} from "siyuan";
 import type {IContext} from "./context";
 import {createLogger, isDebugEnabled} from "./logger";
 import {createScriptScope} from "./scriptApi";
+import {isScriptEnvironmentSupported, parseScriptMeta} from "./scriptMeta";
 import type {IScriptEntry, TScriptLevel} from "./scriptOutput";
 import {showScriptOutput} from "./scriptOutput";
 import type {TOutputMode} from "./settings";
@@ -96,6 +98,19 @@ export const runScript = async (context: IContext, options: {
     blockElement?: HTMLElement;
     code: string;
 }) => {
+    // 脚本开头的 @bis-* 声明：输出弹窗策略可以逐脚本覆盖，前端/后端不匹配时不执行
+    const meta = parseScriptMeta(options.code);
+    if (!isScriptEnvironmentSupported(meta)) {
+        log.info("the script is not available in this environment", {
+            blockID: options.blockID,
+            frontend: getFrontend(),
+            backend: getBackend(),
+            frontends: meta.frontends,
+            backends: meta.backends,
+        });
+        showMessage(context.i18n.scriptUnavailable, 7000, "error");
+        return;
+    }
     const entries: IScriptEntry[] = [];
     const scope = createScriptScope({
         plugin: context.plugin,
@@ -133,7 +148,7 @@ export const runScript = async (context: IContext, options: {
     }
     // 弹不弹窗由设置里的策略决定；默认策略下「没有 return、没有 console 输出、也没有报错」保持静默 ——
     // 这种「点一下做件事」的按钮不该每次都被一个空弹窗挡住。
-    const outputMode = context.getSettings().outputMode;
+    const outputMode = meta.outputMode || context.getSettings().outputMode;
     if (!shouldShowOutput(outputMode, {
         entries,
         hasResult: typeof result !== "undefined",

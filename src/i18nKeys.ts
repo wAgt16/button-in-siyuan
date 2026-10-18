@@ -57,6 +57,7 @@ export type II18n = {
     scriptDocsFailed: string;
     docsLoad: string;
     scriptOutput: string;
+    scriptUnavailable: string;
     returnValue: string;
     errorValue: string;
     noOutput: string;

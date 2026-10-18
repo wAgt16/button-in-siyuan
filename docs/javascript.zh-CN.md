@@ -20,6 +20,27 @@
 - **每次都重新执行**：脚本不保存状态，要记住东西用 `plugin.saveData()` 或写进笔记。
 - **调用内核接口**：`const response = await fetchPost("/api/…", {…})`，响应的 `code` 为 `0` 才算成功。
 
+### 1.1 声明输出弹窗与运行环境
+
+脚本最前面（第一行代码之前）可以用 `//` 注释声明三件事，写在代码中间不生效：
+
+| 声明 | 作用 | 取值 |
+| --- | --- | --- |
+| `// @bis-output <策略>` | 覆盖插件设置里的「JavaScript 输出弹窗」 | `always` / `output` / `console` / `warn` / `error` / `never` |
+| `// @bis-frontends <列表>` | 允许运行的前端 | `all`、`desktop`、`desktop-window`、`mobile`、`browser-desktop`、`browser-mobile` |
+| `// @bis-backends <列表>` | 允许运行的后端 | `all`、`windows`、`linux`、`darwin`、`docker`、`android`、`ios`、`harmony` |
+
+多个值用逗号或空格分隔。不声明时输出策略跟随插件设置，前端与后端都按 `all` 处理；声明里写了 `all`
+也表示不限制。当前环境不在声明的列表里时，按钮只弹一条 Toast，不执行任何代码，也不弹结果弹窗。
+取值与思源集市包的 `frontends` / `backends` 一致。
+
+```javascript
+// @bis-output error
+// @bis-frontends desktop, mobile
+// @bis-backends windows, linux, darwin
+return 1 + 1;
+```
+
 ## 2. 注入接口清单
 
 这些名字被注入成 async 函数的形参，脚本里直接可写；没列出的思源接口拿不到。签名与思源 `petal`（插件 API

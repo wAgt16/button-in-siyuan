@@ -52,6 +52,7 @@
   "scriptDocsFailed": "暂时打不开文档",
   "docsLoad": "载入",
   "scriptOutput": "JavaScript 输出",
+  "scriptUnavailable": "当前环境不支持这个按钮块的运行，未执行 JavaScript",
   "returnValue": "返回值",
   "errorValue": "错误",
   "noOutput": "（无输出）",

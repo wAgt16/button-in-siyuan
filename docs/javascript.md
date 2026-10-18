@@ -26,6 +26,29 @@ section 3 contains a few full examples.
   to remember something.
 - **Calling the kernel**: `const response = await fetchPost("/api/…", {…})`; `code === 0` means success.
 
+### 1.1 Declaring the output dialog and the runtime environment
+
+At the very top of a script (before the first line of code) `//` comments can declare three things; declarations
+after the first code line are ignored:
+
+| Declaration | Effect | Values |
+| --- | --- | --- |
+| `// @bis-output <mode>` | Overrides the plugin's "JavaScript output dialog" setting | `always` / `output` / `console` / `warn` / `error` / `never` |
+| `// @bis-frontends <list>` | Frontends the script may run on | `all`, `desktop`, `desktop-window`, `mobile`, `browser-desktop`, `browser-mobile` |
+| `// @bis-backends <list>` | Backends the script may run on | `all`, `windows`, `linux`, `darwin`, `docker`, `android`, `ios`, `harmony` |
+
+Separate multiple values with commas or spaces. Without a declaration the output mode follows the plugin
+setting and both the frontend and the backend are treated as `all`; an explicit `all` also means unrestricted.
+When the current environment is not in the declared list, the button only shows a toast: no code runs and no
+result dialog opens. The values are the same as SiYuan's marketplace `frontends` / `backends` fields.
+
+```javascript
+// @bis-output error
+// @bis-frontends desktop, mobile
+// @bis-backends windows, linux, darwin
+return 1 + 1;
+```
+
 ## 2. The injected APIs
 
 The names below are injected as the parameters of that async function, so they are directly usable; any SiYuan

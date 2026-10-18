@@ -52,6 +52,7 @@
   "scriptDocsFailed": "The documentation cannot be opened right now",
   "docsLoad": "Load",
   "scriptOutput": "JavaScript output",
+  "scriptUnavailable": "This button block is not available in the current environment; the JavaScript was not run",
   "returnValue": "Return value",
   "errorValue": "Error",
   "noOutput": "(no output)",

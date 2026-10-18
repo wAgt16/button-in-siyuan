@@ -142,6 +142,22 @@ back. The plugin's "JavaScript output dialog" setting only decides whether the *
 window are unaffected by it. Console lines also reach the SiYuan console through the plugin; `console.debug`,
 and every log the plugin writes itself, only appear while the plugin's "Debug mode" setting is on.
 
+A script can override the dialog policy and restrict where it runs with declarations at the very top, before
+the first line of code:
+
+```javascript
+// @bis-output error
+// @bis-frontends desktop, mobile
+// @bis-backends windows, linux, darwin
+```
+
+`@bis-output` takes the same modes as the plugin setting (`always`, `output`, `console`, `warn`, `error`,
+`never`). `@bis-frontends` / `@bis-backends` take the marketplace plugin values (`all`, `desktop`,
+`desktop-window`, `mobile`, `browser-desktop`, `browser-mobile`; `all`, `windows`, `linux`, `darwin`, `docker`,
+`android`, `ios`, `harmony`), comma- or space-separated. Omitting a declaration means `all`. When the current
+environment is not declared, the button shows a toast and the code does not run, so use it for scripts that
+only make sense on one platform.
+
 ```javascript
 // The usual shape of a finished button: a toast per click, and nothing to close.
 showMessage("done");

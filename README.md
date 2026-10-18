@@ -54,7 +54,7 @@ Requires SiYuan 3.8.6 or later.
 
 | Setting | Description |
 | --- | --- |
-| JavaScript output dialog | When the result dialog opens after a script runs: `Always`, `With output` (default), `Console output only`, `On warning (and error)`, `On error`, `Never`. |
+| JavaScript output dialog | When the result dialog opens after a script runs: `Always`, `With output` (default), `Console output only`, `On warning (and error)`, `On error`, `Never`. A script can override this with a `// @bis-output <mode>` declaration at its top; `// @bis-frontends` / `// @bis-backends` also restrict where the script may run. |
 | Debug mode | Off by default: turns on the plugin's own logs (loading, dialogs, failures) in the SiYuan console, plus the script's `console.debug` output (console and result dialog). Off means the plugin prints nothing, and the console only carries what the script itself logs. |
 | JavaScript editor line wrap | Whether content wider than the editor wraps: `Follow SiYuan` (default, the same as <kbd>Settings</kbd> > <kbd>Editor</kbd> > <kbd>Code block wraps</kbd>), `On`, `Off`. |
 | JavaScript editor ligatures | Whether the editor shows ligatures (the code font has to bring them): `Follow SiYuan` (default, the same as <kbd>Settings</kbd> > <kbd>Editor</kbd> > <kbd>Code block ligature</kbd>), `On`, `Off`. |
