@@ -27,8 +27,8 @@
   绝不覆盖用户数据。
 * **插入块**：斜杠项的 id 借用思源放行清单里的 `code`，否则主编辑器的斜杠菜单会按 id 过滤掉插件项。
   桌面端单元格里仍然没有入口（思源 3.8.6 起的单元格富文本编辑器关掉了 `pluginExtensions`，宿主限制）。
-  移动端思源把插件项 html 整个塞进没有 flex 上下文的 `.keyboard__slash-text`，所以斜杠项 html 必须带
-  `bis-slash-item` 标记，由 `index.scss` 把 flex 补回来。
+  斜杠项 html 与官方插件示例一致（`.b3-list-item__first` + `.b3-list-item__text`），移动端也交给宿主布局：
+  思源修好 issue 20866 后，`.keyboard__slash-text` 里的 `.b3-list-item__first` 自带 flex 行，插件不再自己补。
 * **编辑入口**：三条入口（块菜单、按钮右键、按钮长按）都走 `context.openEditor(...)`，由插件入口注入，
   免得渲染器与对话框模块互相引用成环。
 * **移动端侧栏滑动**：宿主的自定义块渲染器给挂载元素挂了一组阻断冒泡的触摸监听

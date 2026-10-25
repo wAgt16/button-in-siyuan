@@ -75,7 +75,7 @@ describe("plugin lifecycle", () => {
         }));
         expect(plugin.protyleSlash).toHaveLength(1);
         expect(plugin.protyleSlash[0].id).toBe("code");
-        expect(plugin.protyleSlash[0].html).toContain("bis-slash-item");
+        expect(plugin.protyleSlash[0].html).toContain("b3-list-item__first");
         expect(plugin.protyleSlash[0].filter).toContain("button");
     });
 

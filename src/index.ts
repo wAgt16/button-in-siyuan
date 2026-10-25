@@ -121,11 +121,10 @@ export default class ButtonInSiYuan extends Plugin {
             // filter 是斜杠菜单的搜索关键字（不显示给用户，所以不放进 i18n）：
             // 中文界面按「按钮块」、英文界面按 button / btn 都能搜到
             filter: [context.i18n.insertButtonBlock, "button", "btn", "按钮块", "anniu"],
-            // 斜杠菜单里的图标是本插件自绘的按钮块图形（src/buttonIcon.ts），与市集图标同源。
-            // bis-slash-item 是给移动端斜杠菜单用的标记：思源会把插件项 html 整个塞进
-            // .keyboard__slash-text（插件项没有图标槽），那里没有 .b3-list-item__first 的 flex 上下文，
-            // 图标与文字会叠成两行，index.scss 里按这个类把 flex 补回来。
-            html: `<div class="b3-list-item__first bis-slash-item">${createButtonBlockIconHtml()}<span class="b3-list-item__text">${context.i18n.insertButtonBlock}</span></div>`,
+            // 斜杠菜单里的图标是本插件自绘的按钮块图形（src/buttonIcon.ts），与市集图标同源；
+            // html 与官方插件示例一致：`.b3-list-item__first` 的 flex 行由宿主管，
+            // 移动端斜杠菜单（插件项 html 塞进 `.keyboard__slash-text`）也一样（思源 issue 20866 已修复）。
+            html: `<div class="b3-list-item__first">${createButtonBlockIconHtml()}<span class="b3-list-item__text">${context.i18n.insertButtonBlock}</span></div>`,
             id: SLASH_ITEM_ID,
             callback: (protyle) => this.insertButtonBlock(protyle),
         }];
